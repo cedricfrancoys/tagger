@@ -11,7 +11,7 @@ TARGET   = tagger.exe
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -I../include
+CFLAGS   = -IC:\TDM-GCC-32\include
 
 LINKER   = gcc -o
 # linking flags here
@@ -32,7 +32,7 @@ rm       = del /Q
 
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
-	@echo Linking binary
+	@echo Linking binary:
 	$(LINKER) $@ $(LFLAGS) $(OBJECTS) $(LIBS)
 	@echo "$@" successfuly generated
 
