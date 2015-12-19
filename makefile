@@ -1,3 +1,11 @@
+# ------------------------------------------------
+# Makefile for Win32 console
+#
+# Author: cedricfrancoys@gmail.com
+# Date  : 2015-12-19
+#
+# ------------------------------------------------
+
 # project name (generate executable with this name)
 TARGET   = tagger.exe
 
@@ -13,11 +21,14 @@ LFLAGS   = -lm
 SRCDIR   = src
 OBJDIR   = obj
 BINDIR   = bin
+LIBDIR   = C:\TDM-GCC-32\lib
 
 SOURCES  := $(wildcard $(SRCDIR)/*.c)
-OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o) 
-LIBS	 = ../lib/libgw32c.a ../lib/libole32.a ../lib/libuuid.a ../lib/libiconv.a
-rm       = rm -f
+OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+LIBS	 = $(LIBDIR)/libgw32c.a $(LIBDIR)/libole32.a $(LIBDIR)/libuuid.a $(LIBDIR)/libiconv.a
+
+FixPath  = $(subst /,\,$1)
+rm       = del /Q
 
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
@@ -32,11 +43,11 @@ $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 
 .PHONEY: clean
 clean:
-	@$(rm) $(OBJECTS)
-	@$(rm) $(BINDIR)/$(TARGET)
+	$(rm) $(call FixPath,$(OBJECTS))
+	$(rm) $(call FixPath,$(BINDIR)/$(TARGET))
 	@echo Cleanup complete
 
 .PHONEY: remove
 remove: clean
-	@$(rm) $(BINDIR)/$(TARGET)
+	@$(rm) $(call FixPath,$(BINDIR)/$(TARGET))
 	@echo Binary removed
