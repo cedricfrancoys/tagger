@@ -13,7 +13,7 @@ Tagger is a cross-platform lightweight command-line tool for tagging files and d
 
 Note: if you plan to work exclusively on Linux, consider as well the excellent [TMSU](http://http://tmsu.org/) project.
 
-
+<pre>
 USAGE: tagger [OPTION] OPERATION [PARAMETERS]
 
 OPTIONS:
@@ -38,3 +38,4 @@ tagger tag +mp3 +music sound.mp3
 tagger -music sound.mp3
 tagger merge mp3 music
 tagger tags sound.mp3
+</pre>
