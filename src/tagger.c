@@ -101,7 +101,7 @@ Copyright (C) 2015, Some Rights Reserved\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.\n";
-    printf(VERSION);
+    puts(VERSION);
 }
 
 /* Display usage information and exit.
@@ -109,18 +109,18 @@ There is NO WARRANTY, to the extent permitted by law.\n";
 */
 void usage (int status) {
     if (status != 0) {
-        printf("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
-        printf("Try 'tagger --help' for more information.\n");
+        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
+        puts("Try 'tagger --help' for more information.\n");
     }
     else {
-        printf("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
-        printf("OPTIONS:\n\
+        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
+        puts("OPTIONS:\n\
   --quiet       Suppress all normal output\n\
   --debug       Output program trace and internal errors\n\
   --help        Display this help text and exit\n\
   --version     Display version information and exit\n"
         );
-        printf("OPERATIONS:\n\
+        puts("OPERATIONS:\n\
   create        Create one or more new tags\n\
   clone         Create a new tag by copying all existin relations from another\n\
   delete        Delete one or more tags (all relations will be lost)\n\
@@ -130,7 +130,7 @@ void usage (int status) {
   files         Show files matching the given criterias\n\
   tags          Show tags related to one or more files (no file means all tags)\n"
         );
-        printf("Examples:\n\
+        puts("Examples:\n\
   tagger create mp3 music\n\
   tagger tag +mp3 +music sound.mp3\n\
   tagger -music sound.mp3\n\
@@ -212,7 +212,7 @@ void op_delete(int argc, char* argv[], int index){
         ELEM el_tag;
         elem_init(ELEM_TAG, argv[i], &el_tag, 0);
         // open the tag element file
-        FILE* fp = fopen(el_tag.file, "r,ccs=UTF-8");
+        FILE* fp = fopen(el_tag.file, "r");
         char elem_name[ELEM_NAME_MAX];
         // read/skip first line
         if(fgets(elem_name, ELEM_NAME_MAX, fp) == NULL) {
@@ -244,7 +244,8 @@ void op_delete(int argc, char* argv[], int index){
     trace(TRACE_NORMAL, "%d tag(s) successfuly deleted.", n);
 }
 
-/* Change the name of specified tag to given name. */
+/* Change the name of specified tag to given name. 
+*/
 void op_rename(int argc, char* argv[], int index){
     // we expect exactly two tags
     if( (argc-index) != 2) {
@@ -316,7 +317,7 @@ void op_tag(int argc, char* argv[], int index){
     char* add_tags[argc];
     char* rem_tags[argc];
     char* files[argc];
-    int add_i = 0, rem_i = 0, files_i = 0;
+    int add_i = 0, rem_i = 0, files_i = 0, tags_i = 0;
 
     // 1) process arguments : memorize actions and targeted files
     for(int i = index; i < argc; ++i) {
@@ -344,12 +345,21 @@ void op_tag(int argc, char* argv[], int index){
             continue;
         }
         if( elem_init(ELEM_FILE, absolute_name, &el_file, 1) <= 0 ) {
-            raise_error(ERROR_ENV, "Unexpected error occured when creating file '%s' for file", el_file.file, el_file.name);
+            raise_error(ERROR_ENV, 
+            			"%s:%d - Unexpected error occured when creating file '%s' for file '%s'", 
+            			__FILE__, __LINE__, el_file.file, el_file.name);
         }
         for(int j = 0; j < add_i; ++j) {
             ELEM el_tag;
             // create tag if it does not exist yet
-            elem_init(ELEM_TAG, add_tags[j], &el_tag, 1);
+            int res = 0;
+            if( (res = elem_init(ELEM_TAG, add_tags[j], &el_tag, 1)) <= 0 ) {
+		        raise_error(ERROR_ENV, 
+		        			"%s:%d - Unexpected error occured when creating file '%s' for tag '%s'", 
+		        			__FILE__, __LINE__, el_tag.file, el_tag.name);
+            
+            }
+            else if(res == 2) tags_i++;
             // add tag to file elem & file to tag elem
             if( elem_relate(ELEM_ADD, &el_file, &el_tag) < 0 ) {
                 raise_error(ERROR_ENV, 
@@ -372,8 +382,9 @@ void op_tag(int argc, char* argv[], int index){
     }
     if(files_i <= 0) trace(TRACE_NORMAL, "Nothing to do.");
     else {
-        if(add_i > 0) trace(TRACE_NORMAL, "%d tag(s) added to %d files(s).", add_i, files_i);
-        if(rem_i > 0) trace(TRACE_NORMAL, "%d tag(s) removed from %d files(s).", rem_i, files_i);
+        if(tags_i > 0)	trace(TRACE_NORMAL, "%d tag(s) created.", tags_i);
+        if(add_i > 0)	trace(TRACE_NORMAL, "%d tag(s) added to %d files(s).", add_i, files_i);
+        if(rem_i > 0)	trace(TRACE_NORMAL, "%d tag(s) removed from %d files(s).", rem_i, files_i);
     }
 }
 
@@ -428,7 +439,7 @@ void op_files(int argc, char* argv[], int index){
                 if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..")) {
                     char* elem_file = xmalloc(strlen(files_dir)+strlen(ep->d_name)+2);
                     sprintf(elem_file, "%s/%s", files_dir, ep->d_name);
-                    FILE* stream = fopen(elem_file, "r,ccs=UTF-8");
+                    FILE* stream = fopen(elem_file, "r");
                     // read first line
                     if(fgets(elem_name, ELEM_NAME_MAX, stream) == NULL) {
                         // unable to read from file
@@ -451,7 +462,9 @@ void op_files(int argc, char* argv[], int index){
             closedir (dp);
         }
         else {
-            raise_error(ERROR_ENV, "Couldn't open files directory");
+            raise_error(ERROR_ENV, 
+            			"%s:%d - Couldn't open files directory",
+            			__FILE__, __LINE__);
         }
     }
     // output resulting files list
@@ -531,11 +544,13 @@ void op_tags(int argc, char* argv[], int index){
                 if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..")) {
                     char* elem_file = xmalloc(strlen(tags_dir)+strlen(ep->d_name)+2);
                     sprintf(elem_file, "%s/%s", tags_dir, ep->d_name);
-                    FILE* stream = fopen(elem_file, "r,ccs=UTF-8");
+                    FILE* stream = fopen(elem_file, "r");
                     // read first line
                     if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
                         // unable to read from file
-                        raise_error(ERROR_ENV, "Couldn't open %s for reading", elem_file);
+                        raise_error(ERROR_ENV, 
+                        			"%s:%d - Couldn't open %s for reading", 
+                        			__FILE__, __LINE__, elem_file);
                     }
                     else {
                         // remove the newline char
@@ -552,7 +567,9 @@ void op_tags(int argc, char* argv[], int index){
             closedir (dp);
         }
         else {
-            raise_error(ERROR_ENV, "Couldn't open tags directory");
+            raise_error(ERROR_ENV, 
+            			"%s:%d - Couldn't open tags directory",
+            			__FILE__, __LINE__);
         }
     }
 

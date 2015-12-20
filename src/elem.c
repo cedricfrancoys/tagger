@@ -37,7 +37,7 @@ char* resolve_name(int type, char* elem_name) {
     sprintf(elem_file, "%s/%s/%s", install_dir, ELEM_DIR[type], elem_id);
 
     // check if the file already exists
-    FILE* stream = fopen(elem_file, "r,ccs=UTF-8");
+    FILE* stream = fopen(elem_file, "r");
     if(stream != NULL) {
         // a file by that name already exists
         char temp_name[ELEM_NAME_MAX];
@@ -61,7 +61,7 @@ char* resolve_name(int type, char* elem_name) {
             }
             sprintf(temp_file, "%s.%02d", elem_file, inc);
             fclose(stream);
-            stream = fopen(temp_file, "r,ccs=UTF-8");
+            stream = fopen(temp_file, "r");
         }
         strcpy(elem_file, temp_file);
         free(temp_file);
@@ -75,7 +75,7 @@ int update_record(char status, char* file, char* name) {
     int result = 0;
     long int pos;
     char line[ELEM_NAME_MAX];
-    FILE* fp = fopen(file, "r+,ccs=UTF-8");
+    FILE* fp = fopen(file, "r+");
 
     if(fp == NULL) {
         // something went wrong
@@ -117,7 +117,7 @@ int elem_init(int type, char* name, ELEM* el, int flag_create) {
     strcpy(el->name, name);
     el->file = resolve_name(el->type, el->name);
     
-    FILE* fp = fopen(el->file, "r,ccs=UTF-8");
+    FILE* fp = fopen(el->file, "r");
     if(fp != NULL) {
         // file already exists and we assume it is consistent (i.e.: full name as first line)
         fclose(fp);
@@ -125,7 +125,7 @@ int elem_init(int type, char* name, ELEM* el, int flag_create) {
     }
     else if(flag_create) {
         // file does not exist yet
-        fp = fopen(el->file, "w,ccs=UTF-8");
+        fp = fopen(el->file, "w");
         if(fp == NULL) {
             // error at file creation
             return -1;
@@ -171,7 +171,7 @@ int elem_relate(char action, ELEM* elem1, ELEM* elem2) {
     }
     if(res == 0 && action == ELEM_ADD) {
         // relation was not found and we need to create the relation
-        FILE* fp = fopen(elem1->file, "a,ccs=UTF-8");
+        FILE* fp = fopen(elem1->file, "a");
         // append a new line at the end of the file
         fprintf(fp, "%c%s\n", ELEM_ADD, elem2->name);
         fclose(fp);
@@ -180,7 +180,7 @@ int elem_relate(char action, ELEM* elem1, ELEM* elem2) {
     // do the same for symetrical relation
     res = update_record(action, elem2->file, elem1->name);
     if(res == 0 && action == ELEM_ADD) {
-        FILE* fp = fopen(elem2->file, "a,ccs=UTF-8");
+        FILE* fp = fopen(elem2->file, "a");
         fprintf(fp, "%c%s\n", ELEM_ADD, elem1->name);
         fclose(fp);
     }
@@ -194,7 +194,7 @@ int elem_relate(char action, ELEM* elem1, ELEM* elem2) {
 int elem_retrieve_list(ELEM* elem, LIST* list) {
     int result = 0;
     char line[ELEM_NAME_MAX];
-    FILE* fp = fopen(elem->file, "r,ccs=UTF-8");
+    FILE* fp = fopen(elem->file, "r");
     if(fp == NULL) {
         return -1;
     }

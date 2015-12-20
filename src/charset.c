@@ -132,7 +132,7 @@ char* strtoutf8(char* cs_from, char* str) {
             if (nconv == (size_t) -1) {
                 // Not everything went right. It might be an unfinished byte sequence 
                 // at the end of the buffer, or an even more serious problem. 
-                if (errno == EINVAL) { }
+                //if (errno == EINVAL) { }
                 free(result);
                 result = NULL;
             }        

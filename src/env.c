@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <limits.h>
 
 #include "xalloc.h"
 #include "elem.h"
@@ -118,7 +119,7 @@ int setup_env() {
     DIR *dp;
     // create a '.tagger' directory if missing
     if(!(dp = opendir(install_dir))) {        
-        if(mkdir(install_dir, 700) < 0) {
+        if(mkdir(install_dir, 0755) < 0) {
             return 0;
         }
     }
@@ -126,14 +127,14 @@ int setup_env() {
     sprintf(sub_dir, "%s/%s", install_dir, ELEM_DIR[ELEM_FILE]);
     if(!(dp = opendir(sub_dir))) {
         // create a '.tagger/files' directory
-        if(mkdir(sub_dir, 700) < 0) {
+        if(mkdir(sub_dir, 0755) < 0) {
             return 0;
         }
     }
     sprintf(sub_dir, "%s/%s", install_dir, ELEM_DIR[ELEM_TAG]);
     if(!(dp = opendir(sub_dir))) {
         // create a '.tagger/tags' directory
-        if(mkdir(sub_dir, 700) < 0) {
+        if(mkdir(sub_dir, 0755) < 0) {
             return 0;
         }
     }
