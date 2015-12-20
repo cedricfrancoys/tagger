@@ -27,7 +27,6 @@ OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 rm       = rm -f
 
-
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	@echo Linking binary:
 	$(LINKER) $@ $(LFLAGS) $(OBJECTS)
@@ -36,7 +35,6 @@ $(BINDIR)/$(TARGET): $(OBJECTS)
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo Compiling "$<"
 	@$(CC) $(CFLAGS) -c $< -o $@
-	
 
 .PHONEY: clean
 clean:
