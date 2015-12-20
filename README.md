@@ -6,6 +6,7 @@ Tagger is a cross-platform lightweight command-line tool for tagging files and d
 * no dependencies
 * no tag naming restrictions
 * no tag limit
+* no SQL (filesystem DB)
 * instant backup (DB stored in 1 directory)
 * easy import / export
 * data stored in UTF-8
