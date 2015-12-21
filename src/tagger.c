@@ -100,7 +100,7 @@ Written by Cedric Francoys\n\
 Copyright (C) 2015, Some Rights Reserved\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n\
 This is free software: you are free to change and redistribute it.\n\
-There is NO WARRANTY, to the extent permitted by law.\n";
+There is NO WARRANTY, to the extent permitted by law.";
     puts(VERSION);
 }
 
@@ -109,16 +109,16 @@ There is NO WARRANTY, to the extent permitted by law.\n";
 */
 void usage (int status) {
     if (status != 0) {
-        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
-        puts("Try 'tagger --help' for more information.\n");
+        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]");
+        puts("Try 'tagger --help' for more information.");
     }
     else {
-        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]\n");
+        puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]");
         puts("OPTIONS:\n\
   --quiet       Suppress all normal output\n\
   --debug       Output program trace and internal errors\n\
   --help        Display this help text and exit\n\
-  --version     Display version information and exit\n"
+  --version     Display version information and exit"
         );
         puts("OPERATIONS:\n\
   create        Create one or more new tags\n\
@@ -128,14 +128,14 @@ void usage (int status) {
   merge         Merge two tags (relations of each tag will be applied to both)\n\
   tag           Add(+) or remove(-) tag(s) to/from one or more files\n\
   files         Show files matching the given criterias\n\
-  tags          Show tags related to one or more files (no file means all tags)\n"
+  tags          Show tags related to one or more files (no file means all tags)"
         );
         puts("Examples:\n\
   tagger create mp3 music\n\
   tagger tag +mp3 +music sound.mp3\n\
   tagger -music sound.mp3\n\
   tagger merge mp3 music\n\
-  tagger tags sound.mp3\n"
+  tagger tags sound.mp3"
         );
     }
 }
@@ -165,7 +165,7 @@ void op_create(int argc, char* argv[], int index){
         else {
             // tag already exists
             ++m;
-            trace(TRACE_DEBUG, "tag already exists\n");
+            trace(TRACE_DEBUG, "Tag '%s' already exists\n", argv[i]);
         }
     }
     trace(TRACE_NORMAL, "%d tag(s) successfully created, %d tag(s) ignored.", n, m);
@@ -191,7 +191,7 @@ void op_clone(int argc, char* argv[], int index){
     }
     if( res != 2){
         // return value must be 2 (created)
-        raise_error(ERROR_USAGE, "Tag '%s' already exists.", el_tag2.name);
+        raise_error(ERROR_USAGE, "A tag by target name '%s' already exists.", el_tag2.name);
     }
     if( elem_init(ELEM_TAG, argv[index], &el_tag1, 0) <= 0 ){
         raise_error(ERROR_ENV, 
@@ -206,11 +206,15 @@ void op_clone(int argc, char* argv[], int index){
  If some files are tagged by the tag(s) being deleted, existing relations are removed as well.
 */
 void op_delete(int argc, char* argv[], int index){
-    int n = 0;
+    int tags_i = 0;
     // for each tag being deleted
-    for(int i = index; i < argc; ++i, ++n) {
+    for(int i = index; i < argc; ++i) {
         ELEM el_tag;
-        elem_init(ELEM_TAG, argv[i], &el_tag, 0);
+        if(elem_init(ELEM_TAG, argv[i], &el_tag, 0) <= 0) {
+            raise_error(ERROR_RECOVERABLE, "Tag '%s' not found", argv[i]);
+            continue;
+		}
+		else ++tags_i;
         // open the tag element file
         FILE* fp = fopen(el_tag.file, "r");
         char elem_name[ELEM_NAME_MAX];
@@ -228,7 +232,7 @@ void op_delete(int argc, char* argv[], int index){
                 elem_name[strlen(elem_name)-1] = 0;
                 ELEM el_file;
                 elem_init(ELEM_FILE, elem_name+1, &el_file, 0);
-                // remove relation with tag being deleted
+                // remove relation with the tag being deleted
                 elem_relate(ELEM_REM, &el_file, &el_tag);
             }
         }
@@ -241,7 +245,7 @@ void op_delete(int argc, char* argv[], int index){
                         __FILE__, __LINE__, el_tag.file);
         }
     }
-    trace(TRACE_NORMAL, "%d tag(s) successfuly deleted.", n);
+    trace(TRACE_NORMAL, "%d tag(s) successfuly deleted.", tags_i);
 }
 
 /* Change the name of specified tag to given name. 
@@ -291,7 +295,9 @@ void op_merge(int argc, char* argv[], int index){
             ELEM el_tag;
             elem_init(ELEM_TAG, argv[i], &el_tag, 0);
             if(elem_retrieve_list(&el_tag, &list_files) < 0) {
-                raise_error(ERROR_ENV, "Unexpected error occured while retrieving list from file %s", el_tag.file);
+                raise_error(ERROR_ENV, 
+							"%s:%d - Unexpected error occured while retrieving list from file %s", 
+							__FILE__, __LINE__, el_tag.file);
             }
         }
         // update relations with resulting files-array
@@ -303,7 +309,9 @@ void op_merge(int argc, char* argv[], int index){
                 ELEM el_file;
                 elem_init(ELEM_FILE, node->str, &el_file, 0);
                 if( elem_relate(ELEM_ADD, &el_file, &el_tag) < 0 ) {
-                    raise_error(ERROR_ENV, "Unexpected error while adding tag %s to file %s", el_tag.name, el_file.name);
+                    raise_error(ERROR_ENV, 
+								"%s:%d - Unexpected error while adding tag %s to file %s", 
+								__FILE__, __LINE__, el_tag.name, el_file.name);
                 }
             }
         }
@@ -575,7 +583,7 @@ void op_tags(int argc, char* argv[], int index){
 
     // output resulting tags names
     if(!list_tags.count) {
-        trace(TRACE_NORMAL, "Database empty or no tag currently applied on given file(s).");
+        trace(TRACE_NORMAL, "No tag currently applied on given file(s).");
     }
     else if(!list_output(&list_tags)) {
         raise_error(ERROR_ENV, 
