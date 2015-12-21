@@ -62,12 +62,16 @@ char* get_output_charset() {
 
     if(strcmp(OS_ENV, "WIN32") == 0) {
         char* tmp = (char*) xmalloc(1024);
+		char* temp_dir = getenv("TEMP");
+		char* chcp_path = (char*) xmalloc(strlen(temp_dir)+strlen("\\chcp.out")+1);
         FILE* fp ;
+		sprintf(chcp_path, "%s\\chcp.out", temp_dir);
         // retrieve current code-page by using 'chcp' system command 
-        fp = fopen("chcp.out", "r");
+        fp = fopen(chcp_path, "r");
         if(fp == NULL) {
-            if(system("chcp > chcp.out") != 0) return NULL;
-            fp = fopen("chcp.out", "r");
+			sprintf(tmp, "chcp > %s", chcp_path);
+            if(system(tmp) != 0) return NULL;
+            fp = fopen(chcp_path, "r");
         }
         if(fp == NULL) return NULL;
         fgets(tmp, 1024, fp);
@@ -77,6 +81,7 @@ char* get_output_charset() {
         charset = strrchr(tmp, ' ')+1;
         sprintf(result, "CP%s", charset);
         fclose(fp);
+		free(chcp_path);
         free(tmp);
     }
     else {
