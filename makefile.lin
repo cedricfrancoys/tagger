@@ -1,5 +1,5 @@
 # ------------------------------------------------
-# Makefile for Win32 console
+# Makefile for Linux
 #
 # Author: cedricfrancoys@gmail.com
 # Date  : 2015-12-19
@@ -7,11 +7,11 @@
 # ------------------------------------------------
 
 # project name (generate executable with this name)
-TARGET   = tagger.exe
+TARGET   = tagger.o
 
-CC       = gcc
+CC       = c99
 # compiling flags here
-CFLAGS   = -IC:\TDM-GCC-32\include -std=c99
+CFLAGS   = -I/usr/include -D_BSD_SOURCE
 
 LINKER   = gcc -o
 # linking flags here
@@ -21,33 +21,28 @@ LFLAGS   = -lm
 SRCDIR   = src
 OBJDIR   = obj
 BINDIR   = bin
-LIBDIR   = C:\TDM-GCC-32\lib
 
 SOURCES  := $(wildcard $(SRCDIR)/*.c)
 OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-LIBS	 = $(LIBDIR)/libgw32c.a $(LIBDIR)/libole32.a $(LIBDIR)/libuuid.a $(LIBDIR)/libiconv.a
 
-FixPath  = $(subst /,\,$1)
-rm       = del /Q
-
+rm       = rm -f
 
 $(BINDIR)/$(TARGET): $(OBJECTS)
 	@echo Linking binary:
-	$(LINKER) $@ $(LFLAGS) $(OBJECTS) $(LIBS)
+	$(LINKER) $@ $(LFLAGS) $(OBJECTS)
 	@echo "$@" successfuly generated
 
 $(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	@echo Compiling "$<"
 	@$(CC) $(CFLAGS) -c $< -o $@
-	
 
 .PHONEY: clean
 clean:
-	$(rm) $(call FixPath,$(OBJECTS))
-	$(rm) $(call FixPath,$(BINDIR)/$(TARGET))
+	@$(rm) $(OBJECTS)
+	@$(rm) $(BINDIR)/$(TARGET)
 	@echo Cleanup complete
 
 .PHONEY: remove
 remove: clean
-	@$(rm) $(call FixPath,$(BINDIR)/$(TARGET))
+	@$(rm) $(BINDIR)/$(TARGET)
 	@echo Binary removed

@@ -580,7 +580,6 @@ void op_tags(int argc, char* argv[], int index){
             			__FILE__, __LINE__);
         }
     }
-
     // output resulting tags names
     if(!list_tags.count) {
         trace(TRACE_NORMAL, "No tag currently applied on given file(s).");
@@ -591,7 +590,6 @@ void op_tags(int argc, char* argv[], int index){
                     __FILE__, __LINE__);
 
     }
-
     list_free(&list_tags);
     free(tags_dir);
 }

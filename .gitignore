@@ -1,9 +1,2 @@
-# Compiled source #
-###################
 obj/*.o
-bin/*.exe
 
-
-# OS generated files #
-######################
-chcp.out

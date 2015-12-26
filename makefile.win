@@ -11,7 +11,7 @@ TARGET   = tagger.exe
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -IC:\TDM-GCC-32\include
+CFLAGS   = -IC:\TDM-GCC-32\include -std=c99
 
 LINKER   = gcc -o
 # linking flags here
