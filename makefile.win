@@ -11,7 +11,7 @@ TARGET   = tagger.exe
 
 CC       = gcc
 # compiling flags here
-CFLAGS   = -IC:\TDM-GCC-32\include -std=c99
+CFLAGS   = -IC:\TDM-GCC-32\include -std=c99 -D_BSD_SOURCE
 
 LINKER   = gcc -o
 # linking flags here
@@ -25,7 +25,7 @@ LIBDIR   = C:\TDM-GCC-32\lib
 
 SOURCES  := $(wildcard $(SRCDIR)/*.c)
 OBJECTS  := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-LIBS	 = $(LIBDIR)/libgw32c.a $(LIBDIR)/libole32.a $(LIBDIR)/libuuid.a $(LIBDIR)/libiconv.a
+LIBS	 = $(LIBDIR)/libgw32c.a $(LIBDIR)/libole32.a $(LIBDIR)/libuuid.a $(LIBDIR)/libiconv.a $(LIBDIR)/libiberty.a
 
 FixPath  = $(subst /,\,$1)
 rm       = del /Q
