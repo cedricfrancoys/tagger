@@ -30,6 +30,16 @@ int update_record(char status, char* file, char* name);
 
 int elem_init(int type, char* name, ELEM* el, int flag_create);
 int elem_relate(char action, ELEM* elem1, ELEM* elem2);
+
+/* Populate a list with nodes holding names of the elements pointed by the given element. */
 int elem_retrieve_list(ELEM* elem, LIST* list);
 
+/* Populate a list with nodes holding names of all elements of given type. */
+int type_retrieve_list(int type, LIST* list);
+
+/* Populate a list with nodes matching the given wildcard. */
+int glob_retrieve_list(int type, char *wildcard, LIST* list);
+
+/* Populate a destination list with nodes holding values of elements related to those in given list. */
+int list_retrieve_list(int type, LIST* elems, LIST* list);
 #endif

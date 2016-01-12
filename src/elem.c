@@ -7,15 +7,23 @@
 
 /* An element is either a tag or a file 
  (i.e. : 'node' is more appropriate since this applies to directories as well)
+ an element can be retrieved with its hash code (32-char md5 digest)
+ collisions are resolved with additional increment (.%02d)
 */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <glob.h>
+#include <fnmatch.h>
+#include <errno.h>
 
 #include "xalloc.h"
 #include "env.h"
 #include "hash.h"
+#include "list.h"
 #include "elem.h"
 
 /* ELEM_DIR is defined in env.c
@@ -23,10 +31,34 @@
 */
 extern const char* ELEM_DIR[];
 
+/* Checks if a file matches a given element name
+*/
+int check_file(char* elem_name, char* file_name){
+    int res = -1;
+    char temp_name[ELEM_NAME_MAX];
+    FILE* stream = fopen(file_name, "r");
+    if(stream == NULL) {
+        // file does not exist yet
+        res = 0;
+    }
+    else {
+        // read first line
+        if (fgets(temp_name, ELEM_NAME_MAX, stream)) {
+            // remove newline char
+            temp_name[strlen(temp_name)-1] = 0;
+            if(strcmp(temp_name, elem_name) == 0) {
+                // match
+                res = 1;
+            }
+        }
+        fclose(stream);
+    }
+    return res;
+}
 
 /* Find the hashed filename (with full path) associated to an element (tag or file).
  In case of collision, name is resolved by adding an extension with an increment.
- (no file is created by this funciton)
+ (this function creates no file and always returns a filename)
 */
 char* resolve_name(int type, char* elem_name) {
 // if( !elem_name || (type != ELEM_FILE && type != ELEM_TAG)) return NULL;
@@ -36,36 +68,12 @@ char* resolve_name(int type, char* elem_name) {
     char* elem_file = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[type])+strlen(elem_id)+3+2+1);
     sprintf(elem_file, "%s/%s/%s", install_dir, ELEM_DIR[type], elem_id);
 
-    // check if the file already exists
-    FILE* stream = fopen(elem_file, "r");
-    if(stream != NULL) {
-        // a file by that name already exists
-        char temp_name[ELEM_NAME_MAX];
-        // temporary filename
-        char* temp_file = xmalloc(strlen(elem_file)+1);
-        strcpy(temp_file, elem_file);
-        // while a file by that name already exists, check the content and increment the name
-        for(int inc = 1; stream != NULL; ++inc) {
-            // look into the file to check its related name
-            if (fgets(temp_name, ELEM_NAME_MAX, stream) == NULL) {
-                // unable to read from file : skip it
-            }
-            else {            
-                // remove the newline char
-                temp_name[strlen(temp_name)-1] = 0;
-                if(strcmp(temp_name, elem_name) == 0) {
-                    // we found the file associated with the given name
-                    fclose(stream);
-                    break;
-                }
-            }
-            sprintf(temp_file, "%s.%02d", elem_file, inc);
-            fclose(stream);
-            stream = fopen(temp_file, "r");
-        }
-        strcpy(elem_file, temp_file);
-        free(temp_file);
+    // while a file by that name already exists (and is not related to the same element)
+    for(int inc = 1; check_file(elem_name, elem_file) < 0; ++inc) {
+        // increment the name
+        sprintf(elem_file, "%s.%02d", elem_file, inc);
     }
+    
     return elem_file;
 }
 
@@ -206,8 +214,8 @@ int elem_retrieve_list(ELEM* elem, LIST* list) {
             // remove the last char ('\n')
             line[strlen(line)-1] = 0;
             // add record to result list
-            NODE* node = xmalloc(sizeof(node));
-            node->str = xmalloc(strlen(line)+1);
+            NODE* node = xzalloc(sizeof(NODE));
+            node->str = (char*) xmalloc(strlen(line)+1);
             //copy the line, omitting first char ('+' or '-')
             strcpy(node->str, line+1);            
             // though we should'nt encounter any duplicate, if we do anyway, just ignore them
@@ -219,4 +227,124 @@ int elem_retrieve_list(ELEM* elem, LIST* list) {
     }
     fclose(fp);
     return result;
+}
+
+/* Populate a list with nodes holding names of all elements of given type.
+*/
+int type_retrieve_list(int type, LIST* list) {
+    // obtain type-specific directory
+    char* install_dir = get_install_dir();
+    // allocate path, adding an extra char for slash/separator
+    char* elems_dir = (char*) xmalloc(strlen(install_dir)+strlen(ELEM_DIR[type])+2);
+    sprintf(elems_dir, "%s/%s", install_dir, ELEM_DIR[type]);
+
+	struct dirent *ep;
+	char elem_name[ELEM_NAME_MAX];
+	DIR *dp = opendir(elems_dir);	
+	if (!dp) return 0;
+	else {
+		while (ep = readdir(dp)) {
+			if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..")) {
+				char* elem_file = xmalloc(strlen(elems_dir)+strlen(ep->d_name)+2);
+				sprintf(elem_file, "%s/%s", elems_dir, ep->d_name);
+				FILE* stream = fopen(elem_file, "r");
+				// read first line
+				if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
+					// unable to read from file
+					fclose(stream);
+					continue;
+				}
+				else {
+					// remove the newline char
+					elem_name[strlen(elem_name)-1] = 0;
+					NODE* node = xmalloc(sizeof(NODE));
+					node->str = xmalloc(strlen(elem_name)+1);
+					strcpy(node->str, elem_name);
+					list_insert_unique(list, node);
+				}
+				fclose(stream);
+				free(elem_file);
+			}
+		}
+		closedir (dp);
+	}
+	free(elems_dir);
+    return 1;
+}
+
+/* Populate a list with nodes holding strings matching the given wildcard
+ List content depends on given type:
+ ELEM_FILE: absolute filenames matching wildcard
+ ELEM_TAG:  tag names matching wildcard
+ (this function calls list_insert_unique, which avoid duplicates)
+*/
+int glob_retrieve_list(int type, char *wildcard, LIST* list) {
+    if(type == ELEM_FILE) {
+        glob_t result;
+        int g_res;
+        if((g_res = glob(wildcard, GLOB_NOSORT|GLOB_NOESCAPE|GLOB_NOCHECK, 0, &result)) != 0) {
+            errno = g_res;
+            return 0;
+        }
+        char* absolute_name;
+        for(int i = result.gl_offs; result.gl_pathv[i]; ++i) {
+            // retrieve absolute name of each file
+            absolute_name = absolute_path(result.gl_pathv[i]);
+            NODE* node = xmalloc(sizeof(NODE));
+            node->str = xmalloc(strlen(absolute_name)+1);
+            strcpy(node->str, absolute_name);
+            // insert filenames into a list (best effort: no error check here)
+            list_insert_unique(list, node);
+        }
+        globfree(&result);
+    }
+    else {
+        LIST* temp_list = (LIST*) xzalloc(sizeof(LIST));
+        temp_list->first = (NODE*) xzalloc(sizeof(NODE));
+        // retrieve all tags
+        if( !type_retrieve_list(ELEM_TAG, temp_list)) {
+           return 0;
+        }
+        // keep only elements having name matching wildcard
+        NODE* ptr = temp_list->first;
+        while(ptr->next) {
+            if(fnmatch(wildcard, ptr->next->str, FNM_NOESCAPE) == FNM_NOMATCH) {
+                // remove non-matching elem
+                NODE* temp = ptr->next;
+                ptr->next = temp->next;
+                free(temp->str);
+                free(temp);			
+                --temp_list->count;                
+            }
+            else ptr = ptr->next;
+            if(!ptr) break;            
+        }
+        // store result into target list
+        list_merge(list, temp_list);      
+        list_free(temp_list);
+    }
+    return 1;
+}
+
+/*
+type specifies the type of elements pointed by elems list
+*/
+int list_retrieve_list(int type, LIST* elems, LIST* list) {    
+    NODE* ptr = elems->first;
+    while(ptr->next) {
+        // retrieve files related to current tag
+        ELEM elem;
+        int res = elem_init(type, ptr->next->str, &elem, 0);
+        if( res <= 0) {
+            // error : non-existing tag or reading error
+            return 0;
+        }                        
+        // add list related to current elem to resulting list
+        if(elem_retrieve_list(&elem, list) < 0) {
+            // error while retrieving list from file
+            return 0;                        
+        }
+        ptr = ptr->next;
+    }
+    return 1;
 }
