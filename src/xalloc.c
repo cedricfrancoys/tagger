@@ -6,7 +6,8 @@
     
     Following functions are adapted from implementations defined in xmalloc.c
     released under GPL 3 by Free Software Foundation, Inc. 
-    See credits below. */
+    See credits below. 
+*/
 
 /*   
    xmalloc.c -- malloc with out of memory checking   
