@@ -10,38 +10,41 @@
 #include <string.h>
 #include <sys/types.h>
 #include <dirent.h>
-#include <errno.h>
-#include <glob.h>
+
 
 #include "env.h"
 #include "charset.h"
 #include "xalloc.h"
 #include "list.h"
 
-/* Populate a list with nodes holding absolute filenames matchning the given wildcard.
- (this function calls list_insert_unique, which avoid duplicates)
-*/
-int glob_retrieve_list(char *wildcard, LIST* list) {
-    glob_t result;
-    int g_res;
-    if((g_res = glob(wildcard, GLOB_NOSORT|GLOB_NOCHECK, 0, &result)) != 0) {
-        errno = g_res;
-        return 0;
-    }
-    char* absolute_name;
-    for(int i = result.gl_offs; result.gl_pathv[i]; ++i) {
-        // retrieve absolute name of each file
-        absolute_name = absolute_path(result.gl_pathv[i]);
-        NODE* node = xmalloc(sizeof(node));
-        node->str = xmalloc(strlen(absolute_name)+1);
-        strcpy(node->str, absolute_name);
-        // insert filenames into a list (best effort: no error check here)
-        list_insert_unique(list, node);
-    }
-    globfree(&result);
-    return 1;
-}
 
+/*
+ Returns a pointer to the node after which given node has to be inserted.
+ If an error occurs or if an equivalent node is already present, function returns NULL.
+*/
+int list_pos(LIST* list, NODE* node, NODE** nodeptr) {
+    if(!list || !node) return -1;
+	int res = 1;
+    NODE* ptr = list->first;
+    while(ptr->next) {
+        int cmp = strcmp(ptr->next->str, node->str);
+        if(cmp == 0) {
+            // an elem by that name is already in the list
+			res = 0;
+            break;
+        }
+        if(cmp > 0) {
+            // we reached to position where the node has to be inserted
+			res = 1;
+            break;
+        }
+        ptr = ptr->next;
+    }
+	if(nodeptr != NULL) {
+		*nodeptr = ptr;
+	}
+	return res;
+}
 
 /* Insert a node into a sorted list.
  (given node is ignored if a node holding an identical string is already in the list)
@@ -52,19 +55,12 @@ int glob_retrieve_list(char *wildcard, LIST* list) {
 */
 int list_insert_unique(LIST* list, NODE* node) {
     if(!list || !node) return -1;
-    NODE* ptr = list->first;
-    while(ptr->next) {
-        int cmp = strcmp(ptr->next->str, node->str);
-        if(cmp == 0) {
-            // an elem by that name is already in the list
-            return 0;
-        }
-        if(cmp > 0) {
-            // we reached to position where the node has to be inserted
-            break;
-        }
-        ptr = ptr->next;
-    }
+	// find first occurence of node string in given list
+    NODE* ptr;
+	if(!list_pos(list, node, &ptr)) {
+		// string already in the list
+		return 0;
+	}
     // insert node at current position
     NODE* temp = ptr->next;
     ptr->next = node;
@@ -73,10 +69,70 @@ int list_insert_unique(LIST* list, NODE* node) {
     return 1;
 }
 
+/* Remove all entries from list1 that are not also present in list2. 
+*/
+int list_intersect(LIST* list1, LIST* list2) {
+    if(!list1 || !list2) return -1;
+
+	NODE* ptr = list1->first;
+	while(ptr->next) {
+		if(list_pos(list2, ptr->next, NULL)) {
+			// if string is not present in list2, remove it from list1
+			NODE* temp = ptr->next;
+			ptr->next = temp->next;
+			free(temp->str);
+			free(temp);			
+			--list1->count;
+		}
+        else ptr = ptr->next;
+		if(!ptr) break;
+	}
+    return 1;
+}
+
+/* Remove all entries from list1 that are present in list2. 
+*/
+int list_diff(LIST* list1, LIST* list2) {
+    if(!list1 || !list2) return -1;
+
+	NODE* ptr = list2->first;
+	while(ptr->next) {
+		NODE* ptr1;
+		if(!list_pos(list1, ptr->next, &ptr1)) {
+			// if string is present in both lists, remove it from list1
+			NODE* temp = ptr1->next;
+			ptr1->next = temp->next;
+			free(temp->str);
+			free(temp);
+			--list1->count;
+		}
+        else ptr = ptr->next;
+		if(!ptr) break;
+	}	
+    return 1;
+}
+
+/* Add each entry in list2 to list1.
+*/
+int list_merge(LIST* list1, LIST* list2) {
+    if(!list1 || !list2) return -1;
+
+	NODE* ptr = list2->first;
+	while(ptr->next) {
+		NODE* new = (NODE*) xzalloc(sizeof(NODE));
+		new->str = (char*) xmalloc(strlen(ptr->next->str)+1);
+		strcpy(new->str, ptr->next->str);
+		list_insert_unique(list1, new);
+		ptr = ptr->next;
+	}	
+    return 1;
+}
+
 /* Print out the content of a list.
  (i.e.: content of the str member of each node, separated by a new line char)
 */
 int list_output(LIST* list){
+	if(!list) return 0;
     for(NODE* node = list->first->next; node; node = node->next) {
         if(!output(stdout, node->str)) {
             return 0;

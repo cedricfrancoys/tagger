@@ -23,20 +23,25 @@ typedef struct list {
     int count;
 } LIST;
 
-/* Populate a list with nodes matchning the given wildcard.
-*/
-int glob_retrieve_list(char *wildcard, LIST* list);
 
-/* Insert elem into a sorted list.
-*/
+int list_pos(LIST* list, NODE* node, NODE** nodeptr);
+
+/* Insert elem into a sorted list. */
 int list_insert_unique(LIST* list, NODE* node);
 
-/* Print out a list of names.
-*/
+/* Remove all entries from list1 that are not also present in list2. */
+int list_intersect(LIST* list1, LIST* list2);
+
+/* Remove all entries from list1 that are present in list2. */
+int list_diff(LIST* list1, LIST* list2);
+
+/* Add each entry in list2 to list1. */
+int list_merge(LIST* list1, LIST* list2);
+
+/* Print out a list of names. */
 int list_output(LIST* list);
 
-/* Deallocate memory used for nodes contained in the list.
-*/
+/* Deallocate memory used for nodes contained in the list. */
 void list_free(LIST* list);
 
 #endif
