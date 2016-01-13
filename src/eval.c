@@ -90,14 +90,15 @@ char* operand_end(char* str) {
 }
 
 
-/* Convert query expression into POSIX notation (op1;op2;operator)
+/* Convert query expression into postfix notation (RPN) (op1;op2;operator)
  This function implements the Shunting-Yard algorithm wich preserves 
  operands order and set operators order according to their priorities.
+ 
  Operands are replaced by a 'x' char in the output buffer (and not copied)
  Note : list of forbidden chars inside operands: (,),&,|,!
  To deal with operand containing operator chars, user must escape it with '{' and '}'
 */
-int posix_convert(char *input, char *output) {
+int postfix_convert(char *input, char *output) {
     char *inptr = input;
     char *outptr = output;
 
@@ -227,25 +228,27 @@ char* next_operand(char* str, char** saveptr) {
 }
 
 /* Evaluates a query string and returns the list of mathching files.
+This function calls postfix_convert to convert query in RPN and then implements postfix algorithm.
+
 Reserved chars/separators are: [space], [parentheses], [ampercent], [more], [not]
 If a tagname contains reserved chars it should be escaped with brackets.
 Thus '{' and '}' chars are forbidden inside tag names.
 */	
 LIST* eval(char* query) {
     char *ptr, *operand;
-    char posix[256];
+    char postfix[256];
     LIST* stack_list[64];
     
     int stack_list_count = 0;
 
-    // scan query to comply with POSIX logical operations order, and replace tag names with a 'x'
-    posix_convert(query, posix); 
-    trace(TRACE_DEBUG, "query posix order: '%s'", posix);
+    // scan query to comply with postfix logical operations order, and replace tag names with a 'x'
+    postfix_convert(query, postfix); 
+    trace(TRACE_DEBUG, "query postfix order: '%s'", postfix);
     operand = next_operand(query, &ptr);
 
     // evaluate query and build the resulting list    
-    for(int i = 0; posix[i]; ++i) {
-        if(posix[i] == 'x') {
+    for(int i = 0; postfix[i]; ++i) {
+        if(postfix[i] == 'x') {
             // if current token is an operand,
             // use last extracted operand from original query string
             // and store its related list into stack_list
@@ -273,7 +276,7 @@ LIST* eval(char* query) {
             // extract next operand
             operand = next_operand(NULL, &ptr);
         }
-        if(posix[i] == '!') {
+        if(postfix[i] == '!') {
             // if current token is 'not' operator
             // apply negation on last list stored in stack_list
             if(stack_list_count <= 0) {
@@ -296,7 +299,7 @@ LIST* eval(char* query) {
             stack_list[stack_list_count-1] = new_list;
             list_free(op_list);
         }
-        if(posix[i] == '&') {
+        if(postfix[i] == '&') {
             // if current token is 'and' operator
             // we need at minimum two lists on stack_list
             if(stack_list_count <= 1) {
@@ -308,7 +311,7 @@ LIST* eval(char* query) {
             list_free(list2);
             --stack_list_count;            
         }
-        if(posix[i] == '|') {
+        if(postfix[i] == '|') {
             // if current token is 'or' operator
             // we need at minimum two lists on stack_list
             if(stack_list_count <= 1) {
