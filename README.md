@@ -45,7 +45,7 @@ tagger [OPTION] OPERATION [PARAMETERS]
 * *errors*: tag T already exists
 * *examples*: 
 <pre>
-tagger create mp3	
+tagger create mp3 music/soundtracks
 </pre>
 
 #### delete ####
@@ -120,7 +120,7 @@ tagger files "music & !mp3"
  * exclamation point, '!' : logical NOT operator (unary)
 * A tag containing spaces should be escaped with double quotes 
  * ex.: tagger files "my music"
-* A tag containing reserved chars inside a query should be escaped with brackets
+* A tag containing reserved chars inside a query should be escaped with curly brackets
  * ex.: tagger files "notes & {thoughts & ideas}"
 
 Final result is built step by step by taking each argument and applying logical OR operator between them. If one of the argument has query format, it is processed as such.
@@ -132,7 +132,7 @@ is equivalent to:
 #### tags ####
 * *description*: List all tags related to one or more files (no file means all tags)
 * *note*: if no file is specified, outputs all existing tags
-* *syntaxe*: tagger tags [FILE1 [FILE2 [...]]]
+* *syntax*: tagger tags [FILE1 [FILE2 [...]]]
 * *examples*: 
 <pre>
 tag tags
@@ -144,44 +144,59 @@ tag tags *.mp3
 
 
 ## Installation ##
-1. Download the project from github.com
+
+
+### Download binary ###
+1. Download the binaries from github.com
+ https://github.com/cedricfrancoys/tagger/releases/latest
+ * Linux 32-bit version: tagger.o (compiled/tested under Ubuntu)
+ * Windows 32-bit version: tagger.exe (compiled/tested under Windows XP) 
 
 2. Copy the executable into the directory of your choice.  
 
   
-* Linux 32-bit version: bin/tagger.o (compiled/tested under Ubuntu)
-* Windows 32-bit version: bin/tagger.exe (compiled/tested under Windows XP) 
+**Note**: program needs read/write access to user's home directory for storing/retrieving data.
 
-If you need to compile the source, refer to the "compiling" section.  
-**Note**: program will need read/write access to home directory for storing/retrieving data.
+### Download sources ###
+Alternatively, you can download source files and compile the project with gcc.  
+See "compiling" section below.
 
 ## Compiling ##
+Download the full project source from github.com either from master repository or, at your opinion, from the latest release page.
+ * https://github.com/cedricfrancoys/tagger/archive/master.zip
+ * https://github.com/cedricfrancoys/tagger/releases/latest
 
-Sources use standard C librairies (C99) + GNU C library (glibc).
 
+Sources use standard C librairies (C99) + GNU C library (glibc).  
+
+**Note**: makefile stores compiled objects in an additional ./obj directory (which is not part of the project).
+So, in order to use the makefile, use 'mkdir obj' first.
 
 ### Linux ###
 
-Use make in your root project directory to generate executable.
+Use 'make' command in your root project directory to generate executable.
 
 <pre>
 cp makefile.lin makefile
 make
-../bin/tagger.o
+./tagger.o
 </pre>
 
 **Note**: compiling under Linux has been tested with gcc and libc6 (under Ubuntu 32-bit).
 ### Windows ###
 
-Use make.exe in your root project directory to generate executable.
+Use 'make.exe' command in your root project directory to generate executable.
 
 <pre>
 copy makefile.win makefile
 make
-bin\tagger.exe
+tagger
 </pre>
 
-**Note**: Compiling under win32 has been tested with MinGW32 (<http://www.mingw.org/download/installer>) and libgw32c-0.4 along with GnuWin32 tools (<http://gnuwin32.sourceforge.net/>).
+**Note**: Compiling under win32 has been tested with MinGW32 and libgw32c-0.4 along with GnuWin32 tools.
+ * http://www.mingw.org/download/installer
+ * http://gnuwin32.sourceforge.net/
+
 ## Author ##
 
 Feel free to send any comments, patches, flowers and suggestions to: Cédric Françoys <cedricfrancoys@gmail.com>
