@@ -174,7 +174,7 @@ void op_create(int argc, char* argv[], int index){
 
 /* Create a new tag that contains all relations of a given tag.
  example: tagger clone mp3 music
- where mp3 is an existing tag and music
+ where mp3 is an existing tag and music does not exist yet
 */
 void op_clone(int argc, char* argv[], int index){
     // we expect exactly two tags
@@ -344,8 +344,7 @@ void op_merge(int argc, char* argv[], int index){
     }
 }
 
-/* Add one or more tag(s) to a file.
- If some files are tagged by the tag(s) being deleted, existing relations are removed as well.
+/* Add one or more tag(s) to onbe or more file(s).
 */
 void op_tag(int argc, char* argv[], int index){
     char* add_tags[argc];
@@ -423,6 +422,8 @@ void op_tag(int argc, char* argv[], int index){
 }
 
 /* Retrieve all files matching given criteria.
+ Arguments might be either a simple string (tagname or wildcard, ex.: mp3 or music/*), 
+or a search query (ex.: "mp3 & !music/soundtracks")
  (This is probabily one of the two most useful function for final user.)
 */
 void op_files(int argc, char* argv[], int index){
@@ -519,7 +520,7 @@ void op_files(int argc, char* argv[], int index){
     free(files_dir);
 }
 
-/* Show all tags applied to specified file(s).
+/* Show all tags currently applied to specified file(s).
 */
 void op_tags(int argc, char* argv[], int index){
     // obtain the tags directory
