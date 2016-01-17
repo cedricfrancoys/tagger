@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Tagger : cross-platform command line tool for tagging files and directories">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Tagger</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/cedricfrancoys/tagger">View on GitHub</a>
+
+          <h1 id="project_title">Tagger</h1>
+          <h2 id="project_tagline">cross-platform command line tool for tagging files and directories</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/cedricfrancoys/tagger/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/cedricfrancoys/tagger/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a id="tagger" class="anchor" href="#tagger" aria-hidden="true"><span class="octicon octicon-link"></span></a>Tagger</h1>
+
+<h2>
+<a id="what-is-tagger" class="anchor" href="#what-is-tagger" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is Tagger?</h2>
+
+<p>Tagger is a cross-platform lightweight command-line tool for tagging files and directories.</p>
+
+<p>Its main features are:</p>
+
+<ul>
+<li>cross-platform (Windows, Linux, Mac OS, Unix)</li>
+<li>no alteration of the tagged files</li>
+<li>no tag naming restrictions</li>
+<li>no tag limit</li>
+<li>no dependencies</li>
+<li>no SQL (filesystem DB)</li>
+<li>instant backup (data stored in 1 directory)</li>
+<li>portable encoding (UTF-8 encoded data)</li>
+<li>easy import / export </li>
+</ul>
+
+<p><em>Tagger program is written in C and released under the GNU Public License version 3.</em></p>
+
+<p>Note: if you plan to work exclusively on Linux, consider as well the excellent <a href="http://http://tmsu.org/">TMSU</a> project.</p>
+
+<h2>
+<a id="how-to-use-it" class="anchor" href="#how-to-use-it" aria-hidden="true"><span class="octicon octicon-link"></span></a>How to use it?</h2>
+
+<h3>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>USAGE</h3>
+
+<pre>
+tagger [OPTION] OPERATION [PARAMETERS]
+</pre>
+
+<h3>
+<a id="options" class="anchor" href="#options" aria-hidden="true"><span class="octicon octicon-link"></span></a>OPTIONS</h3>
+
+<pre>
+  --quiet       Suppress all normal output
+  --debug       Output program trace and internal errors
+  --help        Display this help text and exit
+  --version     Display version information and exit
+</pre>
+
+<h3>
+<a id="operations" class="anchor" href="#operations" aria-hidden="true"><span class="octicon octicon-link"></span></a>OPERATIONS</h3>
+
+<h4>
+<a id="create" class="anchor" href="#create" aria-hidden="true"><span class="octicon octicon-link"></span></a>create</h4>
+
+<ul>
+<li>
+<em>description</em>: Create one or more new tags</li>
+<li>
+<em>syntax</em>: tagger create TAG [TAG2 [TAG3 [...]]]</li>
+<li>
+<em>output</em>: n tag(s) successfully created, m tag(s) ignored</li>
+<li>
+<em>errors</em>: tag T already exists</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger create mp3 music/soundtracks
+</pre>
+</li>
+</ul>
+
+<h4>
+<a id="delete" class="anchor" href="#delete" aria-hidden="true"><span class="octicon octicon-link"></span></a>delete</h4>
+
+<ul>
+<li>
+<em>description</em>: Delete one or more tags (all relations will be lost)</li>
+<li>
+<em>syntax</em>: tagger delete TAG [TAG2 [TAG3 [...]]]</li>
+<li>
+<em>output</em>: n tag(s) successfully deleted, m tag(s) ignored</li>
+<li>
+<em>errors</em>: tag T not found</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger delete mp3
+tagger delete "music/*"
+</pre>
+</li>
+</ul>
+
+<h4>
+<a id="rename" class="anchor" href="#rename" aria-hidden="true"><span class="octicon octicon-link"></span></a>rename</h4>
+
+<ul>
+<li>
+<em>description</em>: Rename an existing tag</li>
+<li>
+<em>syntax</em>: tagger rename [TAG_OLDNAME] [TAG_NEWNAME]</li>
+<li>
+<em>output</em>: tag successfully renamed</li>
+<li>
+<em>errors</em>: tag T not found</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger rename mp3 music/mp3 
+</pre>
+</li>
+</ul>
+
+<h4>
+<a id="merge" class="anchor" href="#merge" aria-hidden="true"><span class="octicon octicon-link"></span></a>merge</h4>
+
+<ul>
+<li>
+<em>description</em>: Merge two tags (relations of each tag will be applied to both)</li>
+<li>
+<em>syntax</em>: tagger merge TAG1 TAG2</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger merge umsic music
+</pre>
+</li>
+</ul>
+
+<h4>
+<a id="clone" class="anchor" href="#clone" aria-hidden="true"><span class="octicon octicon-link"></span></a>clone</h4>
+
+<ul>
+<li>
+<em>description</em>: Create a new tag by copying all existing relations from another</li>
+<li>
+<em>syntax</em>: tagger clone TAG1 TAG2</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger clone music sounds
+</pre>
+<br>
+</li>
+</ul>
+
+<h4>
+<a id="tag" class="anchor" href="#tag" aria-hidden="true"><span class="octicon octicon-link"></span></a>tag</h4>
+
+<ul>
+<li>
+<em>description</em>: Add(+) or removes(-) tag(s) to/from one or more files</li>
+<li>
+<em>note</em>: paramters order does not matter, any argument preceeded by + or - is considered as a tag name.</li>
+<li>
+<em>note</em>: if a given tag does not exist yet, it is automatcaly created (a message will be displayed if the --debug option is set)</li>
+<li>
+<em>syntax</em>: tagger [tag] +|-TAG1 [[+|-TAG2] [...]] FILE1 [FILE2 [...]]</li>
+<li>
+<em>example</em>: 
+<pre>
+tagger tag +"good ideas" notes.txt
+tagger +movies *.mp4
+tagger +music/mp3 +samples -movies test.mp3
+</pre>
+<br>
+</li>
+</ul>
+
+<h4>
+<a id="files" class="anchor" href="#files" aria-hidden="true"><span class="octicon octicon-link"></span></a>files</h4>
+
+<ul>
+<li>
+<em>description</em>: List files matching the given criterias</li>
+<li>
+<em>note</em>: if no criteria is specified, outputs all tagged files</li>
+<li>
+<em>syntax</em>: tagger files TAG1|"QUERY" [TAG2|"QUERY" [TAG3|"QUERY" [...]]]</li>
+<li>
+<em>query syntax</em>: tagger files [!]TAG1 [&amp;| [!]TAG2 [&amp;| [!]TAG3] [...]]</li>
+<li>
+<em>examples</em>: 
+<pre>
+tagger files "music/*"
+tagger files "music &amp; !mp3"
+</pre>.<br>
+</li>
+</ul>
+
+<p><strong>About queries</strong>: </p>
+
+<ul>
+<li>Special chars for queries are: 
+
+<ul>
+<li>parentheses, '(' and ')' : for grouping</li>
+<li>ampercent, '&amp;' : logical AND operator (binary)</li>
+<li>pipe, '|' : logical OR operator (binary)</li>
+<li>exclamation point, '!' : logical NOT operator (unary)</li>
+</ul>
+</li>
+<li>A tag containing spaces should be escaped with double quotes 
+
+<ul>
+<li>ex.: tagger files "my music"</li>
+</ul>
+</li>
+<li>A tag containing reserved chars inside a query should be escaped with curly brackets
+
+<ul>
+<li>ex.: tagger files "notes &amp; {thoughts &amp; ideas}"</li>
+</ul>
+</li>
+</ul>
+
+<p>Final result is built step by step by taking each argument and applying logical OR operator between them. If one of the argument has query format, it is processed as such.</p>
+
+<pre>"a &amp; !b" c</pre> 
+
+<p>is equivalent to: </p>
+
+<pre>"(a &amp; !b) | c"</pre>
+
+<h4>
+<a id="tags" class="anchor" href="#tags" aria-hidden="true"><span class="octicon octicon-link"></span></a>tags</h4>
+
+<ul>
+<li>
+<em>description</em>: List all tags related to one or more files (no file means all tags)</li>
+<li>
+<em>note</em>: if no file is specified, outputs all existing tags</li>
+<li>
+<em>syntax</em>: tagger tags [FILE1 [FILE2 [...]]]</li>
+<li>
+<em>examples</em>: 
+<pre>
+tag tags
+tag tags /home/ced/music/buddy_holly.mp3
+tag tags *.mp3<br>
+</pre>
+<br>
+</li>
+</ul>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<h3>
+<a id="download-binary" class="anchor" href="#download-binary" aria-hidden="true"><span class="octicon octicon-link"></span></a>Download binary</h3>
+
+<ol>
+<li>
+<p>Download the binaries from github.com
+<a href="https://github.com/cedricfrancoys/tagger/releases/latest">https://github.com/cedricfrancoys/tagger/releases/latest</a></p>
+
+<ul>
+<li>Linux 32-bit version: tagger.o (compiled/tested under Ubuntu)</li>
+<li>Windows 32-bit version: tagger.exe (compiled/tested under Windows XP) </li>
+</ul>
+</li>
+<li><p>Copy the executable into the directory of your choice.  </p></li>
+</ol>
+
+<p><strong>Note</strong>: program needs read/write access to user's home directory for storing/retrieving data.</p>
+
+<h3>
+<a id="download-sources" class="anchor" href="#download-sources" aria-hidden="true"><span class="octicon octicon-link"></span></a>Download sources</h3>
+
+<p>Alternatively, you can download source files and compile the project with gcc.<br>
+See "compiling" section below.</p>
+
+<h2>
+<a id="compiling" class="anchor" href="#compiling" aria-hidden="true"><span class="octicon octicon-link"></span></a>Compiling</h2>
+
+<p>Download the full project source from github.com either from master repository or, at your opinion, from the latest release page.</p>
+
+<ul>
+<li><a href="https://github.com/cedricfrancoys/tagger/archive/master.zip">https://github.com/cedricfrancoys/tagger/archive/master.zip</a></li>
+<li><a href="https://github.com/cedricfrancoys/tagger/releases/latest">https://github.com/cedricfrancoys/tagger/releases/latest</a></li>
+</ul>
+
+<p>Sources use standard C librairies (C99) + GNU C library (glibc).  </p>
+
+<p><strong>Note</strong>: makefile stores compiled objects in an additional ./obj directory (which is not part of the project).
+So, in order to use the makefile, use 'mkdir obj' first.</p>
+
+<h3>
+<a id="linux" class="anchor" href="#linux" aria-hidden="true"><span class="octicon octicon-link"></span></a>Linux</h3>
+
+<p>Use 'make' command in your root project directory to generate executable.</p>
+
+<pre>
+cp makefile.lin makefile
+make
+./tagger.o
+</pre>
+
+<p><strong>Note</strong>: compiling under Linux has been tested with gcc and libc6 (under Ubuntu 32-bit).</p>
+
+<h3>
+<a id="windows" class="anchor" href="#windows" aria-hidden="true"><span class="octicon octicon-link"></span></a>Windows</h3>
+
+<p>Use 'make.exe' command in your root project directory to generate executable.</p>
+
+<pre>
+copy makefile.win makefile
+make
+tagger
+</pre>
+
+<p><strong>Note</strong>: Compiling under win32 has been tested with MinGW32 and libgw32c-0.4 along with GnuWin32 tools.</p>
+
+<ul>
+<li><a href="http://www.mingw.org/download/installer">http://www.mingw.org/download/installer</a></li>
+<li><a href="http://gnuwin32.sourceforge.net/">http://gnuwin32.sourceforge.net/</a></li>
+</ul>
+
+<h2>
+<a id="author" class="anchor" href="#author" aria-hidden="true"><span class="octicon octicon-link"></span></a>Author</h2>
+
+<p>Feel free to send any comments, patches, flowers and suggestions to: Cédric Françoys <a href="mailto:cedricfrancoys@gmail.com">cedricfrancoys@gmail.com</a></p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Tagger maintained by <a href="https://github.com/cedricfrancoys">cedricfrancoys</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
