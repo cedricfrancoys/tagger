@@ -58,7 +58,7 @@ int check_file(char* elem_name, char* file_name){
 
 /* Find the hashed filename (with full path) associated to an element (tag or file).
  In case of collision, name is resolved by adding an extension with an increment.
- (this function creates no file and always returns a filename)
+ (this function do not create new file and always returns a filename)
 */
 char* resolve_name(int type, char* elem_name) {
 // if( !elem_name || (type != ELEM_FILE && type != ELEM_TAG)) return NULL;
@@ -147,7 +147,7 @@ int elem_init(int type, char* name, ELEM* el, int flag_create) {
 }
 
 
-/* Create or suppress a symetrical relation between given elements
+/* Create or suppress a symetrical relation between given elements.
  return codes:
  -1 : error
  0  : nothing done
@@ -244,25 +244,26 @@ int type_retrieve_list(int type, LIST* list) {
 	if (!dp) return 0;
 	else {
 		while (ep = readdir(dp)) {
-			if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..")) {
+			if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..") != 0 && strstr(ep->d_name, ".trash") == NULL) {                
 				char* elem_file = xmalloc(strlen(elems_dir)+strlen(ep->d_name)+2);
 				sprintf(elem_file, "%s/%s", elems_dir, ep->d_name);
-				FILE* stream = fopen(elem_file, "r");
-				// read first line
-				if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
-					// unable to read from file
-					fclose(stream);
-					continue;
-				}
-				else {
-					// remove the newline char
-					elem_name[strlen(elem_name)-1] = 0;
-					NODE* node = xmalloc(sizeof(NODE));
-					node->str = xmalloc(strlen(elem_name)+1);
-					strcpy(node->str, elem_name);
-					list_insert_unique(list, node);
-				}
-				fclose(stream);
+				FILE* stream;
+                if(stream = fopen(elem_file, "r")) {
+                    // read first line
+                    if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
+                        // unable to read from file
+                        fclose(stream);
+                    }
+                    else {
+                        // remove the newline char
+                        elem_name[strlen(elem_name)-1] = 0;
+                        NODE* node = xmalloc(sizeof(NODE));
+                        node->str = xmalloc(strlen(elem_name)+1);
+                        strcpy(node->str, elem_name);
+                        list_insert_unique(list, node);
+                    }
+                    fclose(stream);
+                }
 				free(elem_file);
 			}
 		}
@@ -278,8 +279,8 @@ int type_retrieve_list(int type, LIST* list) {
  ELEM_TAG:  tag names matching wildcard
  (this function calls list_insert_unique, which avoid duplicates)
 */
-int glob_retrieve_list(int type, char *wildcard, LIST* list) {
-    if(type == ELEM_FILE) {
+int glob_retrieve_list(int glob_type, int elem_type, char *wildcard, LIST* list) {
+    if(glob_type == GLOB_FS) {
         glob_t result;
         int g_res;
         if((g_res = glob(wildcard, GLOB_NOSORT|GLOB_NOESCAPE|GLOB_NOCHECK, 0, &result)) != 0) {
@@ -302,7 +303,7 @@ int glob_retrieve_list(int type, char *wildcard, LIST* list) {
         LIST* temp_list = (LIST*) xzalloc(sizeof(LIST));
         temp_list->first = (NODE*) xzalloc(sizeof(NODE));
         // retrieve all tags
-        if( !type_retrieve_list(ELEM_TAG, temp_list)) {
+        if( !type_retrieve_list(elem_type, temp_list)) {
            return 0;
         }
         // keep only elements having name matching wildcard
@@ -333,14 +334,14 @@ int list_retrieve_list(int type, LIST* elems, LIST* list) {
     NODE* ptr = elems->first;
     while(ptr->next) {
         // retrieve files related to current tag
-        ELEM elem;
-        int res = elem_init(type, ptr->next->str, &elem, 0);
+        ELEM elem_related;
+        int res = elem_init(type, ptr->next->str, &elem_related, 0);
         if( res <= 0) {
             // error : non-existing tag or reading error
             return 0;
         }                        
         // add list related to current elem to resulting list
-        if(elem_retrieve_list(&elem, list) < 0) {
+        if(elem_retrieve_list(&elem_related, list) < 0) {
             // error while retrieving list from file
             return 0;                        
         }
