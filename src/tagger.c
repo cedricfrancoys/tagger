@@ -20,8 +20,8 @@
 
 
 /* This application allows to apply tags on files and directories
- by maintaining consistency into a filesystem-database. 
- That database consists of two directories containing files 
+ by maintaining consistency into a filesystem-database.
+ That database consists of two directories containing files
  discribing symetrical relations (many to many).
 
  For optimum environment compatibilty, working charset is UTF-8,
@@ -53,12 +53,20 @@
 
 
 /* Global verbose flag
- possible values are:
+Possible values are:
  0    quiet
- 1    normal
+ 1    normal (default)
  2    debug
 */
 int verbose_flag = 1;
+
+/* Global mode flag
+This var tells if current operation must be applied on 'tags' or 'files' elements.
+Possible values are:
+ 1    ELEM_TAG (default)
+ 2    ELEM_FILE
+*/
+int mode_flag = ELEM_TAG;
 
 /* ELEM_DIR is defined in env.c
  Array holding the names of the sub-directories for the database.
@@ -71,6 +79,8 @@ extern const char* ELEM_DIR[];
 static struct option options[] = {
     {"quiet",   0,    &verbose_flag, 0},
     {"debug",   0,    &verbose_flag, 2},
+    {"files",   0,    &mode_flag, ELEM_FILE},
+    {"tags",    0,    &mode_flag, ELEM_FILE},
     {"help",    0,    0, 'h'},
     {"version", 0,    0, 'v'},
     {0, 0, 0, 0}
@@ -82,6 +92,7 @@ static struct operation operations[] = {
     {"create",  op_create},
     {"clone",   op_clone},
     {"delete",  op_delete},
+    {"recover", op_recover},
     {"rename",  op_rename},
     {"merge",   op_merge},
     {"tag",     op_tag},
@@ -148,6 +159,15 @@ void usage (int status) {
  On error, displays a message and exits.
 */
 void op_create(int argc, char* argv[], int index){
+    // we should have received a list of names
+    if( index >= argc) {
+        usage(1);
+        raise_error(ERROR_USAGE, "Wrong number of arguments.");
+    }
+    if( mode_flag != ELEM_TAG) {
+        usage(1);
+        raise_error(ERROR_USAGE, "Operation 'create' applies only on tag elements.");
+    }
     int n = 0, m = 0;
     for(int i = index; i < argc; ++i) {
         trace(TRACE_DEBUG, "creating tag '%s' : ", argv[i]);
@@ -182,6 +202,11 @@ void op_clone(int argc, char* argv[], int index){
         usage(1);
         raise_error(ERROR_USAGE, "Wrong number of arguments.");
     }
+    if( mode_flag != ELEM_TAG) {
+        usage(1);
+        raise_error(ERROR_USAGE, "Operation 'clone' applies only on tag elements.");
+    }
+
     // create a new tag
     ELEM el_tag1, el_tag2;
     int res = elem_init(ELEM_TAG, argv[index+1], &el_tag2, 1);
@@ -203,78 +228,145 @@ void op_clone(int argc, char* argv[], int index){
     op_merge(argc, argv, index);
 }
 
-/* Destroy one or more tag(s).
- If some files are tagged by the tag(s) being deleted, existing relations are removed as well.
+/* Destroy one or more element(s).
+ Any existing relations are removed as well.
 */
 void op_delete(int argc, char* argv[], int index){
-    int tags_i = 0, err_i = 0;
-	LIST* list_tags = (LIST*) xzalloc(sizeof(LIST));
-	list_tags->first = (NODE*) xzalloc(sizeof(NODE));
-    
-    // first pass : build a list with all tags to be deleted
+    int elems_i = 0, err_i = 0;
+	LIST* list = (LIST*) xzalloc(sizeof(LIST));
+	list->first = (NODE*) xzalloc(sizeof(NODE));
+
+    // first pass : build a list with all elements to be deleted
     for(int i = index; i < argc; ++i) {
         if(strchr(argv[i], '*') != NULL) {
             // given name contains wildcard : handle with globbing
-            glob_retrieve_list(ELEM_TAG, argv[i], list_tags);
+            glob_retrieve_list(mode_flag, argv[i], list);
         }
         else {
-            ELEM el_tag;
-            if(elem_init(ELEM_TAG, argv[i], &el_tag, 0) <= 0) {
-                raise_error(ERROR_RECOVERABLE, "Tag '%s' not found", argv[i]);
+            ELEM elem;
+            if(elem_init(mode_flag, argv[i], &elem, 0) <= 0) {
+                raise_error(ERROR_RECOVERABLE, "Element '%s' not found", argv[i]);
                 continue;
             }
             NODE* node = xmalloc(sizeof(NODE));
             node->str = xmalloc(strlen(argv[i])+1);
             strcpy(node->str, argv[i]);
-            list_insert_unique(list_tags, node);        
+            list_insert_unique(list, node);
         }
-    }    
-    // second pass : remove all tags in the list
-    NODE* ptr = list_tags->first;
+    }
+    // second pass : remove all elements in the list
+    NODE* ptr = list->first;
     while(ptr->next) {
-        ELEM el_tag;
-        if(elem_init(ELEM_TAG, ptr->next->str, &el_tag, 0) <= 0) {
+        ELEM elem;
+        if(elem_init(mode_flag, ptr->next->str, &elem, 0) <= 0) {
             raise_error(ERROR_RECOVERABLE, "Tag '%s' not found", ptr->next->str);
             ++err_i;
             continue;
 		}
-		else ++tags_i;
-        // open the tag element file
-        FILE* fp = fopen(el_tag.file, "r");
+		else ++elems_i;
+        // open the element's file
+        FILE* fp = fopen(elem.file, "r");
         char elem_name[ELEM_NAME_MAX];
         // read/skip first line
         if(fgets(elem_name, ELEM_NAME_MAX, fp) == NULL) {
             // unable to read from file
             raise_error(ERROR_ENV,
                         "%s:%d - Couldn't open '%s' for reading",
-                        __FILE__, __LINE__, el_tag.file);
+                        __FILE__, __LINE__, elem.file);
         }
         else {
             // for each pointed file element
             while(fgets(elem_name, ELEM_NAME_MAX, fp)) {
                 // remove the newline char
                 elem_name[strlen(elem_name)-1] = 0;
-                ELEM el_file;
-                elem_init(ELEM_FILE, elem_name+1, &el_file, 0);
-                // remove relation with the tag being deleted
-                elem_relate(ELEM_REM, &el_file, &el_tag);
+                ELEM el_related;
+                elem_init((mode_flag%2)+1, elem_name+1, &el_related, 0);
+                // remove relation with the element being deleted
+                elem_relate(ELEM_REM, &el_related, &elem);
             }
         }
         fclose(fp);
-        // deleted tag element file
-        if(unlink(el_tag.file) < 0) {
+        // deleted element's file
+// instead of unlinking, we should rename the file by apending a .trash to it        
+        if(unlink(elem.file) < 0) {
             // unable to delete file
             raise_error(ERROR_ENV,
                         "%s:%d - Couldn't delete file '%s'",
-                        __FILE__, __LINE__, el_tag.file);
-        }    
+                        __FILE__, __LINE__, elem.file);
+        }
         ptr = ptr->next;
     }
-    list_free(list_tags);
-    trace(TRACE_NORMAL, "%d tag(s) successfuly deleted, %d tag(s) ignored.", tags_i, err_i);
+    list_free(list);
+    trace(TRACE_NORMAL, "%d %s(s) successfuly deleted, %d %s(s) ignored.", elems_i, (mode_flag==ELEM_TAG)?"tag":"file", err_i, (mode_flag==ELEM_TAG)?"tag":"file");
 }
 
-/* Change the name of specified tag to given name.
+/* Recover previously deleted element(s).
+ Any formerly existing relations are recovered as well.
+*/
+void op_recover(int argc, char* argv[], int index){
+	LIST* list = (LIST*) xzalloc(sizeof(LIST));
+	list->first = (NODE*) xzalloc(sizeof(NODE));
+
+    // first pass : build a list with all elements to be deleted
+    for(int i = index; i < argc; ++i) {
+        if(strchr(argv[i], '*') != NULL) {
+            // given name contains wildcard : handle with globbing
+            glob_retrieve_list(mode_flag, argv[i], list);
+        }
+        else {
+            ELEM elem;
+            if(elem_init(mode_flag, argv[i], &elem, 0) <= 0) {
+                raise_error(ERROR_RECOVERABLE, "Element '%s' not found", argv[i]);
+                continue;
+            }
+            NODE* node = xmalloc(sizeof(NODE));
+            node->str = xmalloc(strlen(argv[i])+1);
+            strcpy(node->str, argv[i]);
+            list_insert_unique(list, node);
+        }
+    }
+
+    list_free(list);
+}
+
+/* Merge two elements.
+ Relations from each element are added to the other.
+*/
+void op_merge(int argc, char* argv[], int index){
+    // we should have received a list of two elements or more
+    if( (index+1) >= argc) trace(TRACE_NORMAL, "Nothing to do.");
+    else {
+        NODE node = {0, 0};
+        LIST list = {&node, 0};
+        // create an array of files from all given elements
+        for(int i = index; i < argc; ++i) {
+            ELEM elem;
+            elem_init(mode_flag, argv[i], &elem, 0);
+            if(elem_retrieve_list(&elem, &list) < 0) {
+                raise_error(ERROR_ENV,
+							"%s:%d - Unexpected error occured while retrieving list from file %s",
+							__FILE__, __LINE__, elem.file);
+            }
+        }
+        // update relations with resulting array
+        for(int i = index; i < argc; ++i) {
+            ELEM elem;
+            elem_init(mode_flag, argv[i], &elem, 0);
+            // (re)add current element to each element in the list
+            for(NODE* node = list.first->next; node; node = node->next) {
+                ELEM el_related;
+                elem_init((mode_flag%2)+1, node->str, &el_related, 0);
+                if( elem_relate(ELEM_ADD, &el_related, &elem) < 0 ) {
+                    raise_error(ERROR_ENV,
+								"%s:%d - Unexpected error while adding tag %s to file %s",
+								__FILE__, __LINE__, elem.name, el_related.name);
+                }
+            }
+        }
+    }
+}
+
+/* Change the name of specified element to given name.
 */
 void op_rename(int argc, char* argv[], int index){
     // we expect exactly two tags
@@ -282,66 +374,29 @@ void op_rename(int argc, char* argv[], int index){
         usage(1);
         raise_error(ERROR_USAGE, "Wrong number of arguments.");
     }
-    // create a new tag
-    ELEM el_tag1, el_tag2;
-    int res = elem_init(ELEM_TAG, argv[index+1], &el_tag2, 1);
+    // create a new elem
+    ELEM elem1, elem2;
+    int res = elem_init(mode_flag, argv[index+1], &elem2, 1);
     if( res <= 0) {
         raise_error(ERROR_ENV,
-                    "%s:%d - Unexpected error occured when creating file '%s' for tag '%s'",
-                    __FILE__, __LINE__, el_tag2.file, el_tag2.name);
+                    "%s:%d - Unexpected error occured when creating file '%s' for element '%s'",
+                    __FILE__, __LINE__, elem2.file, elem2.name);
     }
     if( res != 2){
         // return value must be 2 (created)
-        raise_error(ERROR_USAGE, "Tag '%s' already exists.", el_tag2.name);
+        raise_error(ERROR_USAGE, "%s '%s' already exists.", (mode_flag==ELEM_TAG)?"tag":"file", elem2.name);
     }
-    if( elem_init(ELEM_TAG, argv[index], &el_tag1, 0) <= 0 ){
+    if( elem_init(mode_flag, argv[index], &elem1, 0) <= 0 ){
         raise_error(ERROR_ENV,
-                    "%s:%d - Unexpected error occured when retrieving tag %s",
-                    __FILE__, __LINE__, el_tag1.name);
+                    "%s:%d - Unexpected error occured when retrieving element %s",
+                    __FILE__, __LINE__, elem1.name);
     }
-    // merge both tags
-    trace(TRACE_DEBUG, "merging tags '%s' and '%s'", el_tag1.name, el_tag2.name);
+    // merge both elements
+    trace(TRACE_DEBUG, "merging %s '%s' and '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name, elem2.name);
     op_merge(argc, argv, index);
-    // delete original tag
-    trace(TRACE_DEBUG, "deleting tag '%s'", el_tag1.name);
+    // delete original element
+    trace(TRACE_DEBUG, "deleting %s '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name);
     op_delete(argc-1, argv, index);
-}
-
-/* Merge two tags.
- Relations from each tag are added to the other.
-*/
-void op_merge(int argc, char* argv[], int index){
-    // we should have received a list of two tags or more
-    if( (index+1) >= argc) trace(TRACE_NORMAL, "Nothing to do.");
-    else {
-        NODE node = {0, 0};
-        LIST list_files = {&node, 0};
-        // create an array of files from all given tags
-        for(int i = index; i < argc; ++i) {
-            ELEM el_tag;
-            elem_init(ELEM_TAG, argv[i], &el_tag, 0);
-            if(elem_retrieve_list(&el_tag, &list_files) < 0) {
-                raise_error(ERROR_ENV,
-							"%s:%d - Unexpected error occured while retrieving list from file %s",
-							__FILE__, __LINE__, el_tag.file);
-            }
-        }
-        // update relations with resulting files-array
-        for(int i = index; i < argc; ++i) {
-            ELEM el_tag;
-            elem_init(ELEM_TAG, argv[i], &el_tag, 0);
-            // (re)add current tag to each file
-            for(NODE* node = list_files.first->next; node; node = node->next) {
-                ELEM el_file;
-                elem_init(ELEM_FILE, node->str, &el_file, 0);
-                if( elem_relate(ELEM_ADD, &el_file, &el_tag) < 0 ) {
-                    raise_error(ERROR_ENV,
-								"%s:%d - Unexpected error while adding tag %s to file %s",
-								__FILE__, __LINE__, el_tag.name, el_file.name);
-                }
-            }
-        }
-    }
 }
 
 /* Add one or more tag(s) to onbe or more file(s).
@@ -422,7 +477,7 @@ void op_tag(int argc, char* argv[], int index){
 }
 
 /* Retrieve all files matching given criteria.
- Arguments might be either a simple string (tagname or wildcard, ex.: mp3 or music/*), 
+ Arguments might be either a simple string (tagname or wildcard, ex.: mp3 or music/*),
 or a search query (ex.: "mp3 & !music/soundtracks")
  (This is probabily one of the two most useful function for final user.)
 */
@@ -443,29 +498,29 @@ void op_files(int argc, char* argv[], int index){
         for(int i = index; i < argc; ++i) {
 			// each argument should be either a tagname or a query
 			// in any case, those arguments are processed in sequence to build a disjunction (OR clauses)
-		
-			// detect if argument has to be processed as tagname or as a query 
+
+			// detect if argument has to be processed as tagname or as a query
 			if( !is_query(argv[i]) ) {
-                if(strchr(argv[i], '*') != NULL) {                
+                if(strchr(argv[i], '*') != NULL) {
                     // given name contains wildcard : handle with globbing
                     LIST* list_tags = (LIST*) xzalloc(sizeof(LIST));
                     list_tags->first = (NODE*) xzalloc(sizeof(NODE));
-                    // retrieve all tags pointed by wildcard                    
+                    // retrieve all tags pointed by wildcard
                     if(!glob_retrieve_list(ELEM_TAG, argv[i], list_tags)) {
                         raise_error(ERROR_ENV,
                                     "%s:%d - Unable to retrieve tags list for pattern '%s'",
                                     __FILE__, __LINE__, argv[i]);
-                    }                    
+                    }
                     // add all files related to tags list to resulting files list
                     if(!list_retrieve_list(ELEM_TAG, list_tags, list_files)) {
                         raise_error(ERROR_ENV,
                                     "%s:%d - Unable to retrieve files list for pattern '%s'",
-                                    __FILE__, __LINE__, argv[i]);                    
+                                    __FILE__, __LINE__, argv[i]);
                     }
-                    list_free(list_tags);                    
+                    list_free(list_tags);
                 }
-                else {            
-                    // process as a single tag name                
+                else {
+                    // process as a single tag name
                     ELEM el_tag;
                     int res = elem_init(ELEM_TAG, argv[i], &el_tag, 0);
                     if( res < 0) {
@@ -492,10 +547,10 @@ void op_files(int argc, char* argv[], int index){
 					raise_error(ERROR_ENV,
 								"%s:%d - Unexpected error occured while interpreting query '%s'",
 								__FILE__, __LINE__, argv[i]);
-                }                                           
+                }
                 list_merge(list_files, list_query);
                 list_free(list_query);
-			}            
+			}
         }
     }
     else {

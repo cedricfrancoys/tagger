@@ -169,7 +169,7 @@ int elem_relate(char action, ELEM* elem1, ELEM* elem2) {
         return -1;
     }
 
-    // we assume consistency : there can be only one or zero line matching the related elem
+    // we assume consistency, i.e. there is only one or zero line matching the related elem
     
     // try to update the relation if it already exists (if so, we overwrite it)
     int res;
