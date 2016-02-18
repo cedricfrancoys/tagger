@@ -60,9 +60,12 @@ int check_file(char* elem_name, char* file_name){
  In case of collision, name is resolved by adding an extension with an increment.
  (this function do not create new file and always returns a filename)
 */
-char* resolve_name(int type, char* elem_name) {
-// if( !elem_name || (type != ELEM_FILE && type != ELEM_TAG)) return NULL;
+char* resolve_name(int type, char* name) {
     char* install_dir = get_install_dir();
+    char* elem_name = name;
+    if(type == ELEM_FILE){
+        elem_name = absolute_path(name);
+    }
     char* elem_id = hash(elem_name);
     // we add an extra 3 chars for optional increment (in case of collision), and 2 chars for slashes
     char* elem_file = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[type])+strlen(elem_id)+3+2+1);

@@ -25,10 +25,7 @@ static char* errors[] = {
     "charset conversion error, try another locale",
 };
 
-/* For all functions experiencing a non-recoverable error, are expected to set
- the global errno code and return a value indicating something went wrong.
- Then the main driver, in case of such result, outputs an error message using perror
- and exits with EXIT_FAILURE status.
+/* Output an error message and exit program with EXIT_FAILURE status, excepted in case of recoverable error.
 */
 void raise_error(int status, char* template, ...) {
     if(verbose_flag) {
