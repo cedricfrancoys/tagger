@@ -38,8 +38,11 @@ void op_create(int argc, char* argv[], int index);
 /* Create a new tag that contains all relations of a given tag. */
 void op_clone(int argc, char* argv[], int index);
 
-/* Destroy one or more tag(s). */
+/* Destroy one or more element(s). */
 void op_delete(int argc, char* argv[], int index);
+
+/* Recover previously deleted element(s). */
+void op_recover(int argc, char* argv[], int index);
     
 /* Change the name of specified tag to given name. */
 void op_rename(int argc, char* argv[], int index);
@@ -56,5 +59,10 @@ void op_files(int argc, char* argv[], int index);
 /* Show all tags applied to specified file(s). */
 void op_tags(int argc, char* argv[], int index);
 
+/* Show all elements from specified type (set in mode_flag). */
+void op_list(int argc, char* argv[], int index);
+
+/* Retrieve all elements matching given criteria. */
+void op_query(int argc, char* argv[], int index);
 
 #endif

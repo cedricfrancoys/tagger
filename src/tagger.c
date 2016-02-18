@@ -19,10 +19,9 @@
 */
 
 
-/* This application allows to apply tags on files and directories
- by maintaining consistency into a filesystem-database.
- That database consists of two directories containing files
- discribing symetrical relations (many to many).
+/* The purpose of this program is to allow applying tags on files and directories.
+ It does so by maintaining consistency into a filesystem-database consisting of 
+ two directories containing files discribing symetrical relations (many to many).
 
  For optimum environment compatibilty, working charset is UTF-8,
  while input and output charset (as well as pathnames syntax) are OS-dependant.
@@ -80,7 +79,7 @@ static struct option options[] = {
     {"quiet",   0,    &verbose_flag, 0},
     {"debug",   0,    &verbose_flag, 2},
     {"files",   0,    &mode_flag, ELEM_FILE},
-    {"tags",    0,    &mode_flag, ELEM_FILE},
+    {"tags",    0,    &mode_flag, ELEM_TAG},
     {"help",    0,    0, 'h'},
     {"version", 0,    0, 'v'},
     {0, 0, 0, 0}
@@ -96,8 +95,10 @@ static struct operation operations[] = {
     {"rename",  op_rename},
     {"merge",   op_merge},
     {"tag",     op_tag},
+    {"list",    op_list},    
     {"files",   op_files},
     {"tags",    op_tags},
+    {"query",   op_query},    
     {0, 0}
 };
 
@@ -127,27 +128,33 @@ void usage (int status) {
     else {
         puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]");
         puts("OPTIONS:\n\
+  --tags        (default) Set mode to apply operation on 'tag' elements\n\
+  --files       Set mode to apply operation on 'file' elements\n\
   --quiet       Suppress all normal output\n\
   --debug       Output program trace and internal errors\n\
   --help        Display this help text and exit\n\
   --version     Display version information and exit"
         );
         puts("OPERATIONS:\n\
-  create        Create one or more new tags\n\
-  clone         Create a new tag by copying all existin relations from another\n\
-  delete        Delete one or more tags (all relations will be lost)\n\
-  rename        Rename an existing tag\n\
-  merge         Merge two tags (relations of each tag will be applied to both)\n\
+  create        Create one or more new tag(s)\n\
+  clone         Create a new tag by copying all existing relations from another\n\
+  delete        Delete one or more element(s) (all relations will be lost)\n\
+  recover       Recover a previously deleted element\n\
+  rename        Rename an element\n\
+  merge         Merge two elements (existing relations will be applied to both)\n\
   tag           Add(+) or remove(-) tag(s) to/from one or more files\n\
-  files         Show files matching the given criterias\n\
-  tags          Show tags related to one or more files (no file means all tags)"
+  list          Show all elements in database for specified mode\n\
+  query         Retrieve all elements matching given criteria (depends on mode)\n\
+  tags          Equivalent to \"tagger list\" and \"tagger --tags list\"\n\
+  files         Shorthand for \"tagger --files list\""
         );
         puts("Examples:\n\
   tagger create mp3 music\n\
   tagger tag +mp3 +music sound.mp3\n\
   tagger -music sound.mp3\n\
   tagger merge mp3 music\n\
-  tagger tags sound.mp3"
+  tagger query sound.mp3\n\
+  tagger --files list"
         );
     }
 }
@@ -192,9 +199,9 @@ void op_create(int argc, char* argv[], int index){
     trace(TRACE_NORMAL, "%d tag(s) successfully created, %d tag(s) ignored.", n, m);
 }
 
-/* Create a new tag that contains all relations of a given tag.
+/* Create a new element that contains all relations of an existing element.
  example: tagger clone mp3 music
- where mp3 is an existing tag and music does not exist yet
+ where mp3 is an existing tag and music does not exist yet.
 */
 void op_clone(int argc, char* argv[], int index){
     // we expect exactly two tags
@@ -202,29 +209,37 @@ void op_clone(int argc, char* argv[], int index){
         usage(1);
         raise_error(ERROR_USAGE, "Wrong number of arguments.");
     }
-    if( mode_flag != ELEM_TAG) {
-        usage(1);
-        raise_error(ERROR_USAGE, "Operation 'clone' applies only on tag elements.");
+    
+    char* elem1_name = argv[index];
+    char* elem2_name = argv[index+1];
+    if( mode_flag == ELEM_FILE) {
+        // ensure that the destination file exists in the file system
+        elem2_name = absolute_path(elem2_name);
+        FILE* fp = fopen(elem2_name, "r");
+        if(!fp) {
+            raise_error(ERROR_USAGE, "Operation 'clone' cannot be applied on non-existing file '%s'.", elem2_name);
+        }
+        fclose(fp);
     }
 
-    // create a new tag
-    ELEM el_tag1, el_tag2;
-    int res = elem_init(ELEM_TAG, argv[index+1], &el_tag2, 1);
+    // create a new element
+    ELEM elem1, elem2;
+    int res = elem_init(mode_flag, elem2_name, &elem2, 1);
     if( res <= 0) {
         raise_error(ERROR_ENV,
-                    "%s:%d - Unexpected error occured when creating file '%s' for tag '%s'",
-                    __FILE__, __LINE__, el_tag2.file, el_tag2.name);
+                    "%s:%d - Unexpected error occured when creating file '%s' for %s '%s'",
+                    __FILE__, __LINE__, elem2.file, (mode_flag==ELEM_TAG)?"tag":"file", elem2.name);
     }
     if( res != 2){
         // return value must be 2 (created)
-        raise_error(ERROR_USAGE, "A tag by target name '%s' already exists.", el_tag2.name);
+        raise_error(ERROR_USAGE, "A %s named '%s' already exists.", (mode_flag==ELEM_TAG)?"tag":"file", elem2.name);
     }
-    if( elem_init(ELEM_TAG, argv[index], &el_tag1, 0) <= 0 ){
+    if( elem_init(mode_flag, elem1_name, &elem1, 0) <= 0 ){
         raise_error(ERROR_ENV,
-                    "%s:%d - Unexpected error occured when retrieving tag '%s'",
-                    __FILE__, __LINE__, el_tag1.name);
+                    "%s:%d - Unexpected error occured when retrieving %s '%s'",
+                    __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"tag":"file", elem1.name);
     }
-    // merge both tags
+    // merge both elements
     op_merge(argc, argv, index);
 }
 
@@ -240,12 +255,12 @@ void op_delete(int argc, char* argv[], int index){
     for(int i = index; i < argc; ++i) {
         if(strchr(argv[i], '*') != NULL) {
             // given name contains wildcard : handle with globbing
-            glob_retrieve_list(mode_flag, argv[i], list);
+            glob_retrieve_list(GLOB_DB, mode_flag, argv[i], list);
         }
         else {
             ELEM elem;
             if(elem_init(mode_flag, argv[i], &elem, 0) <= 0) {
-                raise_error(ERROR_RECOVERABLE, "Element '%s' not found", argv[i]);
+                raise_error(ERROR_RECOVERABLE, "%s '%s' not found", (mode_flag==ELEM_TAG)?"Tag":"File", argv[i]);
                 continue;
             }
             NODE* node = xmalloc(sizeof(NODE));
@@ -259,7 +274,7 @@ void op_delete(int argc, char* argv[], int index){
     while(ptr->next) {
         ELEM elem;
         if(elem_init(mode_flag, ptr->next->str, &elem, 0) <= 0) {
-            raise_error(ERROR_RECOVERABLE, "Tag '%s' not found", ptr->next->str);
+            raise_error(ERROR_RECOVERABLE, "%s '%s' not found", (mode_flag==ELEM_TAG)?"Tag":"File", ptr->next->str);
             ++err_i;
             continue;
 		}
@@ -287,8 +302,11 @@ void op_delete(int argc, char* argv[], int index){
         }
         fclose(fp);
         // deleted element's file
-// instead of unlinking, we should rename the file by apending a .trash to it        
-        if(unlink(elem.file) < 0) {
+        //if(unlink(elem.file) < 0) {
+        // instead of unlinking, we rename the file by appending a ".trash" to it                
+        char newname[ELEM_NAME_MAX];
+        sprintf(newname, "%s.trash", elem.file);
+        if(rename(elem.file, newname) < 0) {
             // unable to delete file
             raise_error(ERROR_ENV,
                         "%s:%d - Couldn't delete file '%s'",
@@ -304,35 +322,99 @@ void op_delete(int argc, char* argv[], int index){
  Any formerly existing relations are recovered as well.
 */
 void op_recover(int argc, char* argv[], int index){
+    int elems_i = 0, err_i = 0;
 	LIST* list = (LIST*) xzalloc(sizeof(LIST));
 	list->first = (NODE*) xzalloc(sizeof(NODE));
 
-    // first pass : build a list with all elements to be deleted
+    // first pass : build a list with all elements to be recovered
     for(int i = index; i < argc; ++i) {
         if(strchr(argv[i], '*') != NULL) {
             // given name contains wildcard : handle with globbing
-            glob_retrieve_list(mode_flag, argv[i], list);
+            glob_retrieve_list(GLOB_DB, mode_flag, argv[i], list);
         }
-        else {
-            ELEM elem;
-            if(elem_init(mode_flag, argv[i], &elem, 0) <= 0) {
-                raise_error(ERROR_RECOVERABLE, "Element '%s' not found", argv[i]);
-                continue;
-            }
+        else {            
             NODE* node = xmalloc(sizeof(NODE));
             node->str = xmalloc(strlen(argv[i])+1);
             strcpy(node->str, argv[i]);
             list_insert_unique(list, node);
         }
     }
-
+    // second pass : try to restore all elements in the list
+    NODE* ptr = list->first;
+    while(ptr->next) {    
+        char* elem_name = ptr->next->str;        
+        char* elem_file = resolve_name(mode_flag, elem_name);
+        char elem_trash[ELEM_NAME_MAX];        
+        sprintf(elem_trash, "%s.trash", elem_file);
+        if(check_file(elem_name, elem_trash) <= 0){
+            // unable to find trash file
+            raise_error(ERROR_RECOVERABLE, "File '%s' not found", elem_trash);                       
+            trace(TRACE_DEBUG,
+                        "%s:%d - Couldn't locate file '%s' for %s '%s'",
+                        __FILE__, __LINE__, elem_trash, (mode_flag==ELEM_TAG)?"tag":"file", elem_name);
+                        
+            ++err_i;
+        }
+        else {
+            // restore file
+            if(rename(elem_trash, elem_file) < 0) {
+                // unable to restore file
+                raise_error(ERROR_RECOVERABLE, "Unable to rename '%s' to '%s'", elem_trash, elem_file);
+                trace(TRACE_DEBUG,
+                            "%s:%d - Couldn't restore file '%s'",
+                            __FILE__, __LINE__, elem_file);
+                ++err_i;
+            }
+            else {                    
+                ELEM elem;
+                elem_init(mode_flag, elem_name, &elem, 0);
+                // open the element's file
+                FILE* fp = fopen(elem.file, "r");
+                if(!fp) {
+                    raise_error(ERROR_RECOVERABLE, "File '%s' not found", elem.file);
+                    trace(TRACE_DEBUG,
+                                "%s:%d - Couldn't open '%s' for reading",
+                                __FILE__, __LINE__, elem.file);                
+                }
+                else {
+                    char line[ELEM_NAME_MAX];
+                    // read/skip first line
+                    if(fgets(line, ELEM_NAME_MAX, fp) == NULL) {
+                        // unable to read from file
+                        raise_error(ERROR_RECOVERABLE, "Error reading file '%s'", elem.file);
+                        trace(TRACE_DEBUG,
+                                    "%s:%d - Couldn't read from '%s'",
+                                    __FILE__, __LINE__, elem.file);
+                        ++err_i;                                
+                    }
+                    else {
+                        // for each pointed element
+                        while(fgets(line, ELEM_NAME_MAX, fp)) {
+                            // remove the newline char
+                            line[strlen(line)-1] = 0;
+                            ELEM el_related;
+                            elem_init((mode_flag%2)+1, line+1, &el_related, 0);
+                            // remove relation with the element being deleted
+                            elem_relate(ELEM_ADD, &el_related, &elem);
+                        }
+                        ++elems_i;
+                    }
+                    fclose(fp);                                    
+                }
+            }            
+        }
+        free(elem_file);
+        ptr = ptr->next;
+    }
     list_free(list);
+    trace(TRACE_NORMAL, "%d %s(s) successfuly recovered, %d %s(s) ignored.", elems_i, (mode_flag==ELEM_TAG)?"tag":"file", err_i, (mode_flag==ELEM_TAG)?"tag":"file");    
 }
 
 /* Merge two elements.
  Relations from each element are added to the other.
 */
 void op_merge(int argc, char* argv[], int index){
+    int elems_i = 0;
     // we should have received a list of two elements or more
     if( (index+1) >= argc) trace(TRACE_NORMAL, "Nothing to do.");
     else {
@@ -362,7 +444,9 @@ void op_merge(int argc, char* argv[], int index){
 								__FILE__, __LINE__, elem.name, el_related.name);
                 }
             }
+            ++elems_i;
         }
+        trace(TRACE_NORMAL, "%d %s successfuly merged.", elems_i, (mode_flag==ELEM_TAG)?"tags":"files");    
     }
 }
 
@@ -386,17 +470,30 @@ void op_rename(int argc, char* argv[], int index){
         // return value must be 2 (created)
         raise_error(ERROR_USAGE, "%s '%s' already exists.", (mode_flag==ELEM_TAG)?"tag":"file", elem2.name);
     }
+    
+    // trace(TRACE_NORMAL, "1 %s successfuly created.", (mode_flag==ELEM_TAG)?"tag":"file");
+    
     if( elem_init(mode_flag, argv[index], &elem1, 0) <= 0 ){
         raise_error(ERROR_ENV,
                     "%s:%d - Unexpected error occured when retrieving element %s",
                     __FILE__, __LINE__, elem1.name);
     }
+    
+    int temp_flag = verbose_flag;
+
+    trace(TRACE_DEBUG, "merging %s '%s' and '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name, elem2.name);    
     // merge both elements
-    trace(TRACE_DEBUG, "merging %s '%s' and '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name, elem2.name);
-    op_merge(argc, argv, index);
-    // delete original element
+    verbose_flag = 0;
+        op_merge(argc, argv, index);
+    verbose_flag = temp_flag;
+
+    // delete original element    
     trace(TRACE_DEBUG, "deleting %s '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name);
-    op_delete(argc-1, argv, index);
+    verbose_flag = 0;
+        op_delete(argc-1, argv, index);
+    verbose_flag = temp_flag;
+    
+    trace(TRACE_NORMAL, "1 %s successfuly renamed.", (mode_flag==ELEM_TAG)?"tag":"file");
 }
 
 /* Add one or more tag(s) to onbe or more file(s).
@@ -476,23 +573,65 @@ void op_tag(int argc, char* argv[], int index){
     }
 }
 
-/* Retrieve all files matching given criteria.
- Arguments might be either a simple string (tagname or wildcard, ex.: mp3 or music/*),
-or a search query (ex.: "mp3 & !music/soundtracks")
- (This is probabily one of the two most useful function for final user.)
+void op_list(int argc, char* argv[], int index) {
+	LIST* list = (LIST*) xzalloc(sizeof(LIST));
+	list->first = (NODE*) xzalloc(sizeof(NODE));
+
+    trace(TRACE_DEBUG, "reading %s directory", (mode_flag==ELEM_TAG)?"tags":"files");
+    if( !type_retrieve_list(mode_flag, list)) {
+        raise_error(ERROR_ENV,
+                    "%s:%d - Couldn't open %s directory",
+                    __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"tags":"files");
+    }
+
+    // output resulting list
+    if(!list->count) {
+        if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag in database.");
+        else                    trace(TRACE_NORMAL, "No file has been tagged yet.");        
+    }
+    else if(!list_output(list)) {
+        raise_error(ERROR_ENV,
+                    "%s:%d - Unable to output %s list"
+                    __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"tags":"files");
+    }
+    list_free(list);
+}
+
+/* Retrieve all files currently tagged.
 */
 void op_files(int argc, char* argv[], int index){
-    // obtain the files directory
-    char* install_dir = get_install_dir();
-    // allocate path (adding an extra char for slash/separator)
-    char* files_dir = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[ELEM_FILE])+2);
-    sprintf(files_dir, "%s/%s", install_dir, ELEM_DIR[ELEM_FILE]);
+    mode_flag = ELEM_FILE;
+    op_list(argc, argv, index);
+}
 
-	LIST* list_files = (LIST*) xzalloc(sizeof(LIST));
-	list_files->first = (NODE*) xzalloc(sizeof(NODE));
+/* Show all existing tags.
+*/
+void op_tags(int argc, char* argv[], int index){
+    mode_flag = ELEM_TAG;
+    op_list(argc, argv, index);
+}
 
-    if(argc > index) {
+/* Retrieve all files matching given criteria.
+Cretaria consist of a list of elements or a query pointing to elements, that are related to the elements we're looking for.
+
+Arguments might be either a simple string (element name or wildcard, ex.: mp3, music/* or C:\test*),
+or a search query (ex.: "mp3 & !music/soundtracks")
+*/
+void op_query(int argc, char* argv[], int index) {
+    if(index >= argc) {
+        op_list(argc, argv, index);
+    }
+    else {
         // from now on we should have received criteria (list of tags names)
+
+        // obtain the files directory
+        char* install_dir = get_install_dir();
+        // allocate path (adding an extra char for slash/separator)
+        char* elems_dir = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[mode_flag])+2);
+        sprintf(elems_dir, "%s/%s", install_dir, ELEM_DIR[mode_flag]);
+
+        LIST* list_elems = (LIST*) xzalloc(sizeof(LIST));
+        list_elems->first = (NODE*) xzalloc(sizeof(NODE));
 
 		// use arguments to build resulting list
         for(int i = index; i < argc; ++i) {
@@ -503,39 +642,39 @@ void op_files(int argc, char* argv[], int index){
 			if( !is_query(argv[i]) ) {
                 if(strchr(argv[i], '*') != NULL) {
                     // given name contains wildcard : handle with globbing
-                    LIST* list_tags = (LIST*) xzalloc(sizeof(LIST));
-                    list_tags->first = (NODE*) xzalloc(sizeof(NODE));
-                    // retrieve all tags pointed by wildcard
-                    if(!glob_retrieve_list(ELEM_TAG, argv[i], list_tags)) {
+                    LIST* list_related = (LIST*) xzalloc(sizeof(LIST));
+                    list_related->first = (NODE*) xzalloc(sizeof(NODE));
+                    // retrieve all elements pointed by wildcard 
+                    // (we force DB globbing instead of FS globbing by using type ELEM_TAG)
+                    if(!glob_retrieve_list(GLOB_DB, (mode_flag%2)+1, argv[i], list_related)) {
                         raise_error(ERROR_ENV,
-                                    "%s:%d - Unable to retrieve tags list for pattern '%s'",
-                                    __FILE__, __LINE__, argv[i]);
+                                    "%s:%d - Unable to retrieve %s list for pattern '%s'",
+                                    __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"files":"tags", argv[i]);
                     }
-                    // add all files related to tags list to resulting files list
-                    if(!list_retrieve_list(ELEM_TAG, list_tags, list_files)) {
+                    // add all files related to retrieved list to resulting list
+                    if(!list_retrieve_list((mode_flag%2)+1, list_related, list_elems)) {
                         raise_error(ERROR_ENV,
                                     "%s:%d - Unable to retrieve files list for pattern '%s'",
                                     __FILE__, __LINE__, argv[i]);
                     }
-                    list_free(list_tags);
+                    list_free(list_related);
                 }
                 else {
-                    // process as a single tag name
-                    ELEM el_tag;
-                    int res = elem_init(ELEM_TAG, argv[i], &el_tag, 0);
+                    // process as a single elem name
+                    ELEM elem;
+                    int res = elem_init((mode_flag%2)+1, argv[i], &elem, 0);
                     if( res < 0) {
                         raise_error(ERROR_ENV,
-                                    "%s:%d - Unexpected error occured while looking for tag '%s'",
+                                    "%s:%d - Unexpected error occured while looking for element '%s'",
                                     __FILE__, __LINE__, argv[i]);
                     }
-                    else if(!res) {
-                        raise_error(ERROR_USAGE, "Tag '%s' does not exist.", argv[i]);
-                    }
-                    // add files tagged with current tag to resulting list
-                    if(elem_retrieve_list(&el_tag, list_files) < 0) {
-                        raise_error(ERROR_ENV,
-                                    "%s:%d - Unexpected error occured while retrieving list from file '%s'",
-                                    __FILE__, __LINE__, el_tag.file);
+                    else if(res) {
+                        // add files tagged with current tag to resulting list
+                        if(elem_retrieve_list(&elem, list_elems) < 0) {
+                            raise_error(ERROR_ENV,
+                                        "%s:%d - Unexpected error occured while retrieving list from file '%s'",
+                                        __FILE__, __LINE__, elem.file);
+                        }
                     }
                 }
 			}
@@ -548,107 +687,25 @@ void op_files(int argc, char* argv[], int index){
 								"%s:%d - Unexpected error occured while interpreting query '%s'",
 								__FILE__, __LINE__, argv[i]);
                 }
-                list_merge(list_files, list_query);
+                list_merge(list_elems, list_query);
                 list_free(list_query);
 			}
         }
-    }
-    else {
-        // no more argument : display all tagged files
-        trace(TRACE_DEBUG, "reading files directory");
-		if( !type_retrieve_list(ELEM_FILE, list_files)) {
-            raise_error(ERROR_ENV,
-            			"%s:%d - Couldn't open files directory",
-            			__FILE__, __LINE__);
-		}
-    }
-    // output resulting files list
-    if(!list_files->count) {
-        trace(TRACE_NORMAL, "No file matching given pattern.");
-    }
-    else if(!list_output(list_files)) {
-        raise_error(ERROR_ENV,
-                    "%s:%d - Unable to output files list"
-                    __FILE__, __LINE__);
-    }
-    list_free(list_files);
-    free(files_dir);
-}
-
-/* Show all tags currently applied to specified file(s).
-*/
-void op_tags(int argc, char* argv[], int index){
-    // obtain the tags directory
-    char* install_dir = get_install_dir();
-    // allocate path, adding an extra char for slash/separator
-    char* tags_dir = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[ELEM_TAG])+2);
-    sprintf(tags_dir, "%s/%s", install_dir, ELEM_DIR[ELEM_TAG]);
-
-    NODE t_node = {0, 0};
-    LIST list_tags = {&t_node, 0};
-
-    if(argc > index) {
-        // from now on we should have received a list of files
-        // 1) create a list of files for which we want to retrieve applied tags
-        NODE f_node = {0, 0};
-        LIST list_files = {&f_node, 0};
-        char* absolute_name;
-        for(int i = index; i < argc; ++i) {
-            if(strchr(argv[i], '*') != NULL) {
-                // given name contains wildcard : handle with globbing
-                if(!glob_retrieve_list(ELEM_FILE, argv[i], &list_files)) {
-                    raise_error(ERROR_ENV,
-                                "%s:%d - Unable to retrieve file list for pattern '%s'",
-                                __FILE__, __LINE__, argv[i]);
-                }
-            }
-            else {
-                // we assume current arg is a single filename
-                // add it to files list
-                NODE* node = xmalloc(sizeof(node));
-                // check if given file exists
-                if( !(absolute_name = absolute_path(argv[i])) ) {
-                    raise_error(ERROR_RECOVERABLE, "File '%s' not found", argv[i]);
-                }
-                else {
-                    node->str = xmalloc(strlen(absolute_name)+1);
-                    strcpy(node->str, absolute_name);
-                    list_insert_unique(&list_files, node);
-                }
-            }
+        // output resulting files list
+        if(!list_elems->count) {        
+            if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag currently applied on given file(s).");
+            else                    trace(TRACE_NORMAL, "No file currently tagged with given tag(s).");
         }
-        // 2) create a result list containing applied tags of all involved files (with no duplicates)
-        for(NODE* node = list_files.first->next; node; node = node->next){
-            ELEM el_file;
-            if(elem_init(ELEM_FILE, node->str, &el_file, 0) > 0) {
-                elem_retrieve_list(&el_file, &list_tags);
-            }
-        }
-        list_free(&list_files);
-    }
-    else {
-        // no more argument : display all existing tags
-        trace(TRACE_DEBUG, "reading tags directory");
-		if( !type_retrieve_list(ELEM_TAG, &list_tags)) {
+        else if(!list_output(list_elems)) {
             raise_error(ERROR_ENV,
-            			"%s:%d - Couldn't open tags directory",
-            			__FILE__, __LINE__);
-		}
-    }
-    // output resulting tags names
-    if(!list_tags.count) {
-        trace(TRACE_NORMAL, "No tag currently applied on given file(s).");
-    }
-    else if(!list_output(&list_tags)) {
-        raise_error(ERROR_ENV,
-                    "%s:%d - Unable to output tags list"
-                    __FILE__, __LINE__);
+                        "%s:%d - Unable to output elements list"
+                        __FILE__, __LINE__);
+        }
 
+        list_free(list_elems);
+        free(elems_dir);        
     }
-    list_free(&list_tags);
-    free(tags_dir);
 }
-
 
 int main(int argc, char* argv[]) {
 
