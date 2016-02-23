@@ -639,7 +639,8 @@ void op_query(int argc, char* argv[], int index) {
 			// in any case, those arguments are processed in sequence to build a disjunction (OR clauses)
 
 			// detect if argument has to be processed as tagname or as a query
-			if( !is_query(argv[i]) ) {
+// disabling query syntax when given arg is a filename (filenames can be complex and building queries with them is of little use)
+			if( mode_flag == ELEM_TAG || !is_query(argv[i]) ) {
                 if(strchr(argv[i], '*') != NULL) {
                     // given name contains wildcard : handle with globbing
                     LIST* list_related = (LIST*) xzalloc(sizeof(LIST));
@@ -728,6 +729,11 @@ int main(int argc, char* argv[]) {
     // we convert the entire argv to UTF-8
     char* cs_from = get_input_charset();
     for(int i = 1; i < argc; ++i) {
+        if(strlen(argv[i]) == 0){
+            // invalid argument
+            usage(1);            
+            raise_error(ERROR_USAGE, "Empty argument detected.");
+        }
         // if something goes wrong, pointer is assigned to NULL
         argv[i] = strtoutf8(cs_from, argv[i]);
     }
