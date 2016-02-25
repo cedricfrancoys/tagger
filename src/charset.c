@@ -131,7 +131,7 @@ char* strtoutf8(char* cs_from, char* str) {
         else {
             // output size might be up to four times bigger than input
             size_t len_out = len_in*4;
-            result = (char*) xzalloc(len_out);        
+            result = (char*) xzalloc(len_out+1);        
             char *p_in = str, *p_out = result;        
             size_t nconv = iconv (cd, &p_in, &len_in, &p_out, &len_out);
             if (nconv == (size_t) -1) {
@@ -157,7 +157,9 @@ char* utf8tostr(char* cs_to, char* str) {
     if(cs_to == NULL) {
         return result;
     }
-    size_t len_in = utf8len(str)+1;    
+
+    size_t len_in = strlen(str)+1;
+    
     if(strcmp(cs_to, "UTF-8") == 0) {
         result = (char*) xmalloc(len_in);
         strcpy(result, str);
