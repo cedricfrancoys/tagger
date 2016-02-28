@@ -106,15 +106,16 @@ static struct operation operations[] = {
 /* Output information about current version.
 */
 void version(void) {
-    static const char* VERSION = "\
-tagger 1.0\n\
-\n\
+    const char* VERSION = "tagger 1.0";
+    const char* LICENSE = "\
 Written by Cedric Francoys\n\
 Copyright (C) 2015, Some Rights Reserved\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.";
+
     puts(VERSION);
+    puts(LICENSE);
 }
 
 /* Display usage information.
@@ -576,18 +577,46 @@ void op_tag(int argc, char* argv[], int index){
 void op_list(int argc, char* argv[], int index) {
 	LIST* list = (LIST*) xzalloc(sizeof(LIST));
 	list->first = (NODE*) xzalloc(sizeof(NODE));
-
-    trace(TRACE_DEBUG, "reading %s directory", (mode_flag==ELEM_TAG)?"tags":"files");
-    if( !type_retrieve_list(mode_flag, list)) {
-        raise_error(ERROR_ENV,
-                    "%s:%d - Couldn't open %s directory",
-                    __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"tags":"files");
+    
+    // argument may be used as mask for limiting resulting list (ex. tagger --files list "C:\test\*")
+    // this allows to check a single element or to retrieve all nodes inside a given directory
+    if(index < argc) {
+        if(strchr(argv[index], '*') != NULL) {
+            // given name contains wildcard : handle with globbing
+            if(!glob_retrieve_list(GLOB_DB, mode_flag, argv[index], list)) {
+                raise_error(ERROR_ENV,
+                            "%s:%d - Unable to retrieve %s list for pattern '%s'",
+                            __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"files":"tags", argv[index]);            
+            }
+        }
+        else {
+            // check if given element is present in DB
+            ELEM elem;
+            if( elem_init(mode_flag, argv[index], &elem, 0) > 0) {
+                NODE* node = xmalloc(sizeof(NODE));
+                node->str = xmalloc(strlen(elem.name)+1);
+                strcpy(node->str, elem.name);                
+                list_insert_unique(list, node);                
+            }
+        }
     }
-
+    else {
+        trace(TRACE_DEBUG, "reading %s directory", (mode_flag==ELEM_TAG)?"tags":"files");
+        if( !type_retrieve_list(mode_flag, list)) {
+            raise_error(ERROR_ENV,
+                        "%s:%d - Couldn't open %s directory",
+                        __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"tags":"files");
+        }
+    }
     // output resulting list
     if(!list->count) {
-        if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag in database.");
-        else                    trace(TRACE_NORMAL, "No file has been tagged yet.");        
+        if(index < argc) {
+            trace(TRACE_NORMAL, "No %s with given name in database.", (mode_flag==ELEM_TAG)?"tag":"file"); 
+        }
+        else {
+            if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag in database.");
+            else                    trace(TRACE_NORMAL, "No file has been tagged yet.");
+        }
     }
     else if(!list_output(list)) {
         raise_error(ERROR_ENV,
