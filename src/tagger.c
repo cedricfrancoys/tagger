@@ -138,7 +138,7 @@ void usage (int status) {
         );
         puts("OPERATIONS:\n\
   create        Create one or more new tag(s)\n\
-  clone         Create a new tag by copying all existing relations from another\n\
+  clone         Create a new element by copying all relations from another\n\
   delete        Delete one or more element(s) (all relations will be lost)\n\
   recover       Recover a previously deleted element\n\
   rename        Rename an element\n\
@@ -146,7 +146,7 @@ void usage (int status) {
   tag           Add(+) or remove(-) tag(s) to/from one or more files\n\
   list          Show all elements in database for specified mode\n\
   query         Retrieve all elements matching given criteria (depends on mode)\n\
-  tags          Equivalent to \"tagger list\" and \"tagger --tags list\"\n\
+  tags          Shorthand for \"tagger --tags list\"\n\
   files         Shorthand for \"tagger --files list\""
         );
         puts("Examples:\n\
