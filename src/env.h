@@ -15,6 +15,11 @@ char* fix_path(char* path);
 
 char* absolute_path(char* filename);
 
+/* Obtain the path of a file relatively to install dir */
+char* relative_path(char* filename);
+
+char* get_path(char* filename);
+
 char* get_install_dir();
 
 int check_env();

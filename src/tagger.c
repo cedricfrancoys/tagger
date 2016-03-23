@@ -67,6 +67,14 @@ Possible values are:
 */
 int mode_flag = ELEM_TAG;
 
+/* Local DB flag
+This var allows use to force using a local database (in which case, filenames stored in DB are relative to current folder).
+Possible values are:
+ 0 global database - user's home dir (default)
+ 1 local database - current directory
+*/
+int local_flag = 0;
+
 /* ELEM_DIR is defined in env.c
  Array holding the names of the sub-directories for the database.
 */
@@ -80,6 +88,7 @@ static struct option options[] = {
     {"debug",   0,    &verbose_flag, 2},
     {"files",   0,    &mode_flag, ELEM_FILE},
     {"tags",    0,    &mode_flag, ELEM_TAG},
+    {"local",   0,    &local_flag, 1},    
     {"help",    0,    0, 'h'},
     {"version", 0,    0, 'v'},
     {0, 0, 0, 0}

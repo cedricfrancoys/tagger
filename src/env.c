@@ -17,6 +17,10 @@
 #include "elem.h"
 #include "env.h"
 
+/* local flag is defined and set in the main driver (tagger.c)
+*/
+extern int local_flag;
+
 
 const char* APP_DIR = ".tagger";
 
@@ -72,21 +76,43 @@ char* absolute_path(char* filename) {
     return fix_path(absolute_name);
 }
 
+/* Obtain the path of a file relatively to install dir
+*/
+char* relative_path(char* filename) {
+// todo 
+    char* relative_path = absolute_path(filename);
+    return NULL;
+}
+
+char* get_path(char* filename) {
+    if(local_flag) return relative_path(filename);
+    return absolute_path(filename);
+}
+
 /* Retrieve the installation directory ([user homedir]/.tagger)
 */
 char* get_install_dir() {
     static char* install_dir = "";
     if(strlen(install_dir) == 0) {
-        if(strcmp(OS_ENV, "WIN32") == 0) {
-            char* homedrive = getenv("HOMEDRIVE");
-            char* homepath = getenv("HOMEPATH");
-            install_dir = xmalloc(strlen(homedrive)+strlen(homepath)+strlen(APP_DIR)+2);
-            sprintf(install_dir, "%s%s\\%s", homedrive, homepath, APP_DIR);           
+        if(local_flag) {
+            char current_dir[FILENAME_MAX];
+            getcwd(current_dir, FILENAME_MAX);
+            install_dir = xmalloc(strlen(current_dir)+strlen(APP_DIR)+2);
+            getcwd(install_dir, FILENAME_MAX);
+            sprintf(install_dir, "%s\\%s", current_dir, APP_DIR);           
         }
         else {
-            char* home = getenv("HOME");
-            install_dir = xmalloc(strlen(home)+strlen(APP_DIR)+2);
-            sprintf(install_dir, "%s/%s", home, APP_DIR);
+            if(strcmp(OS_ENV, "WIN32") == 0) {
+                char* homedrive = getenv("HOMEDRIVE");
+                char* homepath = getenv("HOMEPATH");
+                install_dir = xmalloc(strlen(homedrive)+strlen(homepath)+strlen(APP_DIR)+2);
+                sprintf(install_dir, "%s%s\\%s", homedrive, homepath, APP_DIR);           
+            }
+            else {
+                char* home = getenv("HOME");
+                install_dir = xmalloc(strlen(home)+strlen(APP_DIR)+2);
+                sprintf(install_dir, "%s/%s", home, APP_DIR);
+            }
         }
     }
     return install_dir;
