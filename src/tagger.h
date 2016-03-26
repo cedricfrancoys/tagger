@@ -31,6 +31,8 @@ struct operation {
     void (*f)(int, char*[], int);
 };
 
+/* Set up tagger database. */
+void op_init(int argc, char* argv[], int index);
 
 /* Create a new empty tag. */
 void op_create(int argc, char* argv[], int index);

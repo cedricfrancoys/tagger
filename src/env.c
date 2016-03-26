@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include "xalloc.h"
 #include "elem.h"
@@ -21,7 +22,6 @@
 */
 extern int local_flag;
 
-
 const char* APP_DIR = ".tagger";
 
 const char* ELEM_DIR[] = {"", "tags", "files"};
@@ -30,8 +30,10 @@ const char* ELEM_DIR[] = {"", "tags", "files"};
 */
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 const char* OS_ENV = "WIN32";
+const char* path_separator = "\\";
 #else
 const char* OS_ENV = "POSIX";
+const char* path_separator = "/";
 #endif  
 
 /* We'll use a local-defined value for constant FILENAME_MAX.
@@ -47,17 +49,16 @@ const char* OS_ENV = "POSIX";
 */
 #define FILENAME_MAX 1024
 
+
 /* Convert a path string according to current environment.
  Deal with  backslashes ('\') and slashes ('/') conversions,
  and remove trailing slash(es) (according to POSIX standard).
 */
 char* fix_path(char* path) {
     int i;
-    char separator = '/';
-    if(strcmp(OS_ENV, "WIN32") == 0) separator = '\\';
     for(i = 0; path[i] && i < FILENAME_MAX; ++i) {
         if(path[i] == '\\' || path[i] == '/') {
-            path[i] = separator;
+            path[i] = path_separator[0];
         }
     }
     while(i && (path[i-1] == '/' || path[i-1] == '\\')) {
@@ -79,9 +80,41 @@ char* absolute_path(char* filename) {
 /* Obtain the path of a file relatively to install dir
 */
 char* relative_path(char* filename) {
-// todo 
-    char* relative_path = absolute_path(filename);
-    return NULL;
+    static char relative_name[FILENAME_MAX]; 
+    char* absolute_name = absolute_path(filename);
+    char reference_name[FILENAME_MAX];
+    getcwd(reference_name, FILENAME_MAX);
+    
+    // init result string
+    relative_name[0] = '\0';    
+    // check first char (under windows, if differs, we return absolute path)
+    if(absolute_name[0] != reference_name[0]) {
+        return absolute_name;
+    }    
+    // make copies to avoid altering original strings
+    char* path_a = strdup(absolute_name);
+    char* path_r = strdup(reference_name);
+     
+    int inc;
+    int size_a = strlen(path_a)+1;
+    int size_r = strlen(path_r)+1;
+
+    for(inc = 0; inc < size_a && inc < size_r; inc += strlen(path_a+inc)+1) {
+        char* token_a = strchr(path_a+inc, path_separator[0]);
+        char* token_r = strchr(path_r+inc, path_separator[0]);        
+        if(token_a) token_a[0] = '\0';
+        if(token_r) token_r[0] = '\0';        
+        if(strcmp(path_a+inc, path_r+inc) != 0) break;
+    }
+    
+    for(int inc_r = inc; inc_r < size_r; inc_r += strlen(path_r+inc_r)+1) {
+        strcat(relative_name, "..");
+        strcat(relative_name, path_separator);        
+        if( !strchr(reference_name+inc_r, path_separator[0]) ) break;
+    }
+
+    if(inc < size_a) strcat(relative_name, absolute_name+inc);
+    return relative_name;
 }
 
 char* get_path(char* filename) {
@@ -98,7 +131,6 @@ char* get_install_dir() {
             char current_dir[FILENAME_MAX];
             getcwd(current_dir, FILENAME_MAX);
             install_dir = xmalloc(strlen(current_dir)+strlen(APP_DIR)+2);
-            getcwd(install_dir, FILENAME_MAX);
             sprintf(install_dir, "%s\\%s", current_dir, APP_DIR);           
         }
         else {

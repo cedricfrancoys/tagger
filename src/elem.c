@@ -31,6 +31,13 @@
 */
 extern const char* ELEM_DIR[];
 
+/* trash flag is defined in main driver (tagger.c)
+Allows to restrict current operation to trashed elements only.
+*/
+extern int trash_flag;
+
+
+
 /* Checks if a file matches a given element name
 */
 int check_file(char* elem_name, char* file_name){
@@ -62,17 +69,13 @@ int check_file(char* elem_name, char* file_name){
 */
 char* resolve_name(int type, char* name) {
     char* install_dir = get_install_dir();
-    char* elem_name = name;
-    if(type == ELEM_FILE){
-        elem_name = absolute_path(name);
-    }
-    char* elem_id = hash(elem_name);
+    char* elem_id = hash(name);
     // we add an extra 3 chars for optional increment (in case of collision), and 2 chars for slashes
     char* elem_file = xmalloc(strlen(install_dir)+strlen(ELEM_DIR[type])+strlen(elem_id)+3+2+1);
     sprintf(elem_file, "%s/%s/%s", install_dir, ELEM_DIR[type], elem_id);
 
     // while a file by that name already exists (and is not related to the same element)
-    for(int inc = 1; check_file(elem_name, elem_file) < 0; ++inc) {
+    for(int inc = 1; check_file(name, elem_file) < 0; ++inc) {
         // increment the name
         sprintf(elem_file, "%s.%02d", elem_file, inc);
     }
@@ -123,6 +126,11 @@ int elem_init(int type, char* name, ELEM* el, int flag_create) {
     if(el == NULL) {
         el = &temp;
     }
+    if(type == ELEM_FILE){
+        if( !(name = get_path(name)) ) {
+            return -1;
+        }        
+    }        
     el->type = type;
     el->name = xmalloc(strlen(name)+1);
     strcpy(el->name, name);
@@ -247,28 +255,33 @@ int type_retrieve_list(int type, LIST* list) {
 	if (!dp) return 0;
 	else {
 		while (ep = readdir(dp)) {
-			if(strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..") != 0 && strstr(ep->d_name, ".trash") == NULL) {                
-				char* elem_file = xmalloc(strlen(elems_dir)+strlen(ep->d_name)+2);
-				sprintf(elem_file, "%s/%s", elems_dir, ep->d_name);
-				FILE* stream;
-                if(stream = fopen(elem_file, "r")) {
-                    // read first line
-                    if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
-                        // unable to read from file
-                        fclose(stream);
-                    }
-                    else {
-                        // remove the newline char
-                        elem_name[strlen(elem_name)-1] = 0;
-                        NODE* node = xmalloc(sizeof(NODE));
-                        node->str = xmalloc(strlen(elem_name)+1);
-                        strcpy(node->str, elem_name);
-                        list_insert_unique(list, node);
-                    }
+            // skip current dir and parent dir
+			if(strcmp(ep->d_name, ".") == 0 && strcmp(ep->d_name, "..") == 0) continue;
+
+            // force casting strstr result to boolean
+            if( !trash_flag != !strstr(ep->d_name, ".trash") ) continue;
+            
+            char* elem_file = xmalloc(strlen(elems_dir)+strlen(ep->d_name)+2);
+            sprintf(elem_file, "%s/%s", elems_dir, ep->d_name);
+            FILE* stream;
+            if(stream = fopen(elem_file, "r")) {
+                // read first line
+                if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
+                    // unable to read from file
                     fclose(stream);
                 }
-				free(elem_file);
-			}
+                else {
+                    // remove the newline char
+                    elem_name[strlen(elem_name)-1] = 0;
+                    NODE* node = xmalloc(sizeof(NODE));
+                    node->str = xmalloc(strlen(elem_name)+1);
+                    strcpy(node->str, elem_name);
+                    list_insert_unique(list, node);
+                }
+                fclose(stream);
+            }
+            free(elem_file);
+
 		}
 		closedir (dp);
 	}
@@ -290,13 +303,13 @@ int glob_retrieve_list(int glob_type, int elem_type, char *wildcard, LIST* list)
             errno = g_res;
             return 0;
         }
-        char* absolute_name;
+        char* filepath;
         for(int i = result.gl_offs; result.gl_pathv[i]; ++i) {
-            // retrieve absolute name of each file
-            absolute_name = absolute_path(result.gl_pathv[i]);
+            // retrieve full filepath of each file
+            filepath = get_path(result.gl_pathv[i]);
             NODE* node = xmalloc(sizeof(NODE));
-            node->str = xmalloc(strlen(absolute_name)+1);
-            strcpy(node->str, absolute_name);
+            node->str = xmalloc(strlen(filepath)+1);
+            strcpy(node->str, filepath);
             // insert filenames into a list (best effort: no error check here)
             list_insert_unique(list, node);
         }

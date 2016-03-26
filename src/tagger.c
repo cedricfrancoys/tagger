@@ -49,31 +49,40 @@
 #include "eval.h"
 #include "tagger.h"
 
+/* Global flags */
 
-
-/* Global verbose flag
-Possible values are:
+/* verbose flag
+Possible values:
  0    quiet
  1    normal (default)
  2    debug
 */
 int verbose_flag = 1;
 
-/* Global mode flag
-This var tells if current operation must be applied on 'tags' or 'files' elements.
-Possible values are:
+/* mode flag
+Defines what kind of element current operation must be applied on ('tags' or 'files').
+Possible values:
  1    ELEM_TAG (default)
  2    ELEM_FILE
 */
 int mode_flag = ELEM_TAG;
 
-/* Local DB flag
-This var allows use to force using a local database (in which case, filenames stored in DB are relative to current folder).
-Possible values are:
- 0 global database - user's home dir (default)
- 1 local database - current directory
+/* local DB flag
+Allows to force using a local database (in which case, filenames stored in DB are relative to current folder).
+Possible values:
+ 0    global database - user's home dir (default)
+ 1    local database - current directory
 */
 int local_flag = 0;
+
+/* trash flag
+Allows to restrict current operation to trashed elements only.
+Possible values:
+ 0    normal (default)
+ 1    trashed elements
+*/
+int trash_flag = 0;
+
 
 /* ELEM_DIR is defined in env.c
  Array holding the names of the sub-directories for the database.
@@ -88,7 +97,8 @@ static struct option options[] = {
     {"debug",   0,    &verbose_flag, 2},
     {"files",   0,    &mode_flag, ELEM_FILE},
     {"tags",    0,    &mode_flag, ELEM_TAG},
-    {"local",   0,    &local_flag, 1},    
+    {"local",   0,    &local_flag, 1},
+    {"trash",   0,    &trash_flag, 1},
     {"help",    0,    0, 'h'},
     {"version", 0,    0, 'v'},
     {0, 0, 0, 0}
@@ -97,6 +107,7 @@ static struct option options[] = {
 /* Available operations and related handlers
 */
 static struct operation operations[] = {
+    {"init",    op_init},
     {"create",  op_create},
     {"clone",   op_clone},
     {"delete",  op_delete},
@@ -140,12 +151,15 @@ void usage (int status) {
         puts("OPTIONS:\n\
   --tags        (default) Set mode to apply operation on 'tag' elements\n\
   --files       Set mode to apply operation on 'file' elements\n\
+  --local       Force using a local database (current folder)\n\
+  --trash       Restrict current operation to trashed elements only\n\
   --quiet       Suppress all normal output\n\
   --debug       Output program trace and internal errors\n\
-  --help        Display this help text and exit\n\
-  --version     Display version information and exit"
+  --help        Display this help text\n\
+  --version     Display version information"
         );
         puts("OPERATIONS:\n\
+  init          Setup tagger environment (create an empty database)\n\
   create        Create one or more new tag(s)\n\
   clone         Create a new element by copying all relations from another\n\
   delete        Delete one or more element(s) (all relations will be lost)\n\
@@ -169,6 +183,19 @@ void usage (int status) {
     }
 }
 
+void op_init(int argc, char* argv[], int index) {
+    // check for application environment
+    if(!check_env()) {
+        if(!setup_env()) {
+            raise_error(ERROR_ENV, "Unable to set up environment");
+        }
+        trace(TRACE_NORMAL, "Environment successfully created.");
+    }
+    else {
+        // environment already inbitialized
+        trace(TRACE_NORMAL, "Environment already set up: nothing to do.");
+    }
+}
 
 /* Create one or more tags.
  Already existing tags are ignored.
@@ -530,19 +557,14 @@ void op_tag(int argc, char* argv[], int index){
         }
     }
 
-    // 2) apply changes to each file
-    char* absolute_name;
+    // 2) apply changes to each file    
     for(int i = 0; i < files_i; ++i) {
         ELEM el_file;
-        // retrieve absolute name of the file
-        if( !(absolute_name = absolute_path(files[i])) ) {
-            raise_error(ERROR_RECOVERABLE, "File '%s' not found", files[i]);
-            continue;
-        }
-        if( elem_init(ELEM_FILE, absolute_name, &el_file, 1) <= 0 ) {
-            raise_error(ERROR_ENV,
+        if( elem_init(ELEM_FILE, files[i], &el_file, 1) <= 0 ) {
+            raise_error(ERROR_RECOVERABLE,
             			"%s:%d - Unexpected error occured when creating file '%s' for file '%s'",
             			__FILE__, __LINE__, el_file.file, el_file.name);
+            continue;
         }
         for(int j = 0; j < add_i; ++j) {
             ELEM el_tag;
@@ -748,15 +770,6 @@ void op_query(int argc, char* argv[], int index) {
 
 int main(int argc, char* argv[]) {
 
-    // check for application environment
-    if(!check_env()) {
-        trace(TRACE_NORMAL, "Installation directory not found or corrupted...");
-        if(!setup_env()) {
-            raise_error(ERROR_ENV, "Unable to set up environment");
-        }
-        trace(TRACE_NORMAL, "Environment successfully created.");
-    }
-
     // no argument received: display usage and quit
     if (argc < 2) {
         usage(1);
@@ -817,6 +830,11 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // 2 bis) check for environment
+    if(!check_env()) {
+        trace(TRACE_NORMAL, "Installation directory not found or corrupted... Try 'tagger init'");
+    }
+    
     // 2) check operation
     trace(TRACE_DEBUG, "checking operations");
 
@@ -842,6 +860,10 @@ int main(int argc, char* argv[]) {
             raise_error(ERROR_USAGE, "Invalid operation.");
         }
     }
-
+    else {
+        // no argument received: display usage and quit
+        usage(1);
+        raise_error(ERROR_USAGE, "No argument received.");
+    }
     return EXIT_SUCCESS;
 }
