@@ -246,7 +246,7 @@ int type_retrieve_list(int type, LIST* list) {
     // obtain type-specific directory
     char* install_dir = get_install_dir();
     // allocate path, adding an extra char for slash/separator
-    char* elems_dir = (char*) xmalloc(strlen(install_dir)+strlen(ELEM_DIR[type])+2);
+    char* elems_dir = (char*) xmalloc( strlen(install_dir) + strlen(ELEM_DIR[type]) + 2);
     sprintf(elems_dir, "%s/%s", install_dir, ELEM_DIR[type]);
 
 	struct dirent *ep;
@@ -268,7 +268,6 @@ int type_retrieve_list(int type, LIST* list) {
                 // read first line
                 if (fgets (elem_name, ELEM_NAME_MAX, stream) == NULL) {
                     // unable to read from file
-                    fclose(stream);
                 }
                 else {
                     // remove the newline char

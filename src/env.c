@@ -125,24 +125,24 @@ char* get_path(char* filename) {
 /* Retrieve the installation directory ([user homedir]/.tagger)
 */
 char* get_install_dir() {
-    static char* install_dir = "";
+    static char install_dir[FILENAME_MAX] = "";
     if(strlen(install_dir) == 0) {
         if(local_flag) {
             char current_dir[FILENAME_MAX];
             getcwd(current_dir, FILENAME_MAX);
-            install_dir = xmalloc(strlen(current_dir)+strlen(APP_DIR)+2);
+            // install_dir = xmalloc(strlen(current_dir)+strlen(APP_DIR)+2);
             sprintf(install_dir, "%s\\%s", current_dir, APP_DIR);           
         }
         else {
             if(strcmp(OS_ENV, "WIN32") == 0) {
                 char* homedrive = getenv("HOMEDRIVE");
                 char* homepath = getenv("HOMEPATH");
-                install_dir = xmalloc(strlen(homedrive)+strlen(homepath)+strlen(APP_DIR)+2);
+                // install_dir = xmalloc(strlen(homedrive)+strlen(homepath)+strlen(APP_DIR)+2);
                 sprintf(install_dir, "%s%s\\%s", homedrive, homepath, APP_DIR);           
             }
             else {
                 char* home = getenv("HOME");
-                install_dir = xmalloc(strlen(home)+strlen(APP_DIR)+2);
+                // install_dir = xmalloc(strlen(home)+strlen(APP_DIR)+2);
                 sprintf(install_dir, "%s/%s", home, APP_DIR);
             }
         }

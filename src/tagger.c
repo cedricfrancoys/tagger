@@ -455,13 +455,13 @@ void op_merge(int argc, char* argv[], int index){
     // we should have received a list of two elements or more
     if( (index+1) >= argc) trace(TRACE_NORMAL, "Nothing to do.");
     else {
-        NODE node = {0, 0};
-        LIST list = {&node, 0};
+    	LIST* list = (LIST*) xzalloc(sizeof(LIST));
+    	list->first = (NODE*) xzalloc(sizeof(NODE));    
         // create an array of files from all given elements
         for(int i = index; i < argc; ++i) {
             ELEM elem;
             elem_init(mode_flag, argv[i], &elem, 0);
-            if(elem_retrieve_list(&elem, &list) < 0) {
+            if(elem_retrieve_list(&elem, list) < 0) {
                 raise_error(ERROR_ENV,
 							"%s:%d - Unexpected error occured while retrieving list from file %s",
 							__FILE__, __LINE__, elem.file);
@@ -472,7 +472,7 @@ void op_merge(int argc, char* argv[], int index){
             ELEM elem;
             elem_init(mode_flag, argv[i], &elem, 0);
             // (re)add current element to each element in the list
-            for(NODE* node = list.first->next; node; node = node->next) {
+            for(NODE* node = list->first->next; node; node = node->next) {
                 ELEM el_related;
                 elem_init((mode_flag%2)+1, node->str, &el_related, 0);
                 if( elem_relate(ELEM_ADD, &el_related, &elem) < 0 ) {
@@ -483,6 +483,7 @@ void op_merge(int argc, char* argv[], int index){
             }
             ++elems_i;
         }
+        list_free(list);
         trace(TRACE_NORMAL, "%d %s successfuly merged.", elems_i, (mode_flag==ELEM_TAG)?"tags":"files");    
     }
 }

@@ -145,8 +145,7 @@ int list_output(LIST* list){
 /* Deallocate memory used for nodes contained in the list.
 */
 void list_free(LIST* list) {
-    // We don't know how was allocated the root node
-    NODE* node = list->first->next;
+    NODE* node = list->first;
     while(node) {
         NODE* next = node->next;
         free(node->str);
