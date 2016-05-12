@@ -19,15 +19,17 @@
 */
 
 
-/* The purpose of this program is to allow applying tags on files and directories.
- It does so by maintaining consistency into a filesystem-database consisting of 
- two directories containing files discribing symetrical relations (many to many).
+/* The purpose of this program is to allow applying tags on filesystem nodes
+ (files and directories). It does so by maintaining consistency into a
+ filesystem-database consisting of two directories containing files that discribe
+ symetrical relations (many to many).
 
  For optimum environment compatibilty, working charset is UTF-8,
  while input and output charset (as well as pathnames syntax) are OS-dependant.
 */
 
 #include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -67,13 +69,26 @@ Possible values:
 */
 int mode_flag = ELEM_TAG;
 
+
 /* local DB flag
+@deprecated
 Allows to force using a local database (in which case, filenames stored in DB are relative to current folder).
 Possible values:
  0    global database - user's home dir (default)
  1    local database - current directory
 */
-int local_flag = 0;
+// int local_flag = 0;
+
+/*
+*/
+char ENV_PATH[FILENAME_MAX] = "home";
+
+char ENV_DIR[FILENAME_MAX] = ".tagger";
+
+char DB_NODE_SYNTAX[10] = "absolute";
+
+char DB_CHARSET[32] = "UTF-8";
+
 
 /* trash flag
 Allows to restrict current operation to trashed elements only.
@@ -84,6 +99,16 @@ Possible values:
 int trash_flag = 0;
 
 
+/* Non-boolean long options that have no corresponding short equivalents.  */
+enum {
+  MODE_OPTION = CHAR_MAX + 1,
+  LOCAL_OPTION,
+  ENV_PATH_OPTION,
+  ENV_DIR_OPTION,
+  DB_NODE_SYNTAX_OPTION,
+  DB_CHARSET_OPTION
+};
+
 /* ELEM_DIR is defined in env.c
  Array holding the names of the sub-directories for the database.
 */
@@ -93,14 +118,25 @@ extern const char* ELEM_DIR[];
 /* Available options
 */
 static struct option options[] = {
-    {"quiet",   0,    &verbose_flag, 0},
-    {"debug",   0,    &verbose_flag, 2},
-    {"files",   0,    &mode_flag, ELEM_FILE},
-    {"tags",    0,    &mode_flag, ELEM_TAG},
-    {"local",   0,    &local_flag, 1},
-    {"trash",   0,    &trash_flag, 1},
-    {"help",    0,    0, 'h'},
-    {"version", 0,    0, 'v'},
+    {"quiet",           0,    &verbose_flag, 0},
+    {"debug",           0,    &verbose_flag, 2},
+
+    {"trash",           0,    &trash_flag, 1},
+
+    {"mode",            1,    0, MODE_OPTION},          // default : tags
+    {"files",           0,    &mode_flag, ELEM_FILE},
+    {"tags",            0,    &mode_flag, ELEM_TAG},
+
+    {"env-path",        1,    0, ENV_PATH_OPTION},      // default : home
+    {"env-dir",         1,    0, ENV_DIR_OPTION},       // default : .tagger
+    {"local",           0,    0, LOCAL_OPTION},
+
+    {"db-node-syntax",  1,    0, DB_NODE_SYNTAX_OPTION},// default : absolute
+    {"db-charset",      1,    0, DB_CHARSET_OPTION},    // default : UTF-8
+
+    {"help",            0,    0, 'h'},
+    {"version",         0,    0, 'v'},
+
     {0, 0, 0, 0}
 };
 
@@ -115,10 +151,11 @@ static struct operation operations[] = {
     {"rename",  op_rename},
     {"merge",   op_merge},
     {"tag",     op_tag},
-    {"list",    op_list},    
+    {"list",    op_list},
     {"files",   op_files},
     {"tags",    op_tags},
-    {"query",   op_query},    
+    {"query",   op_query},
+    {"clean",   op_clean},
     {0, 0}
 };
 
@@ -149,14 +186,19 @@ void usage (int status) {
     else {
         puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]");
         puts("OPTIONS:\n\
-  --tags        (default) Set mode to apply operation on 'tag' elements\n\
-  --files       Set mode to apply operation on 'file' elements\n\
-  --local       Force using a local database (current folder)\n\
-  --trash       Restrict current operation to trashed elements only\n\
-  --quiet       Suppress all normal output\n\
-  --debug       Output program trace and internal errors\n\
-  --help        Display this help text\n\
-  --version     Display version information"
+  --mode=           Specify on which elements operation is to apply\n\
+  --tags            Set mode to apply operation on 'tag' elements (default)\n\
+  --files           Set mode to apply operation on 'file' elements\n\n\
+  --env-path=       'home|'current'|{custom path}\n\
+  --env-dir=        default is '.tagger'\n\
+  --local           Force using current directory for database\n\n\
+  --trash           Restrict current operation to trashed elements only\n\
+  --db-charset=     Specify database charset (default is UTF-8)\n\
+  --db-node-syntax= Define how filenames are stored (relative or absolute path)\n\n\
+  --quiet           Suppress all normal output\n\
+  --debug           Output program trace and internal errors\n\
+  --help            Display this help text\n\
+  --version         Display version information"
         );
         puts("OPERATIONS:\n\
   init          Setup tagger environment (create an empty database)\n\
@@ -181,6 +223,12 @@ void usage (int status) {
   tagger --files list"
         );
     }
+}
+
+/* Remove deleted items from DB files (info will no longer remain in trash)
+*/
+void op_clean(int argc, char* argv[], int index) {
+    // todo
 }
 
 void op_init(int argc, char* argv[], int index) {
@@ -246,7 +294,7 @@ void op_clone(int argc, char* argv[], int index){
         usage(1);
         raise_error(ERROR_USAGE, "Wrong number of arguments.");
     }
-    
+
     char* elem1_name = argv[index];
     char* elem2_name = argv[index+1];
     if( mode_flag == ELEM_FILE) {
@@ -340,7 +388,7 @@ void op_delete(int argc, char* argv[], int index){
         fclose(fp);
         // deleted element's file
         //if(unlink(elem.file) < 0) {
-        // instead of unlinking, we rename the file by appending a ".trash" to it                
+        // instead of unlinking, we rename the file by appending a ".trash" to it
         char newname[ELEM_NAME_MAX];
         sprintf(newname, "%s.trash", elem.file);
         if(rename(elem.file, newname) < 0) {
@@ -369,7 +417,7 @@ void op_recover(int argc, char* argv[], int index){
             // given name contains wildcard : handle with globbing
             glob_retrieve_list(GLOB_DB, mode_flag, argv[i], list);
         }
-        else {            
+        else {
             NODE* node = xmalloc(sizeof(NODE));
             node->str = xmalloc(strlen(argv[i])+1);
             strcpy(node->str, argv[i]);
@@ -378,18 +426,18 @@ void op_recover(int argc, char* argv[], int index){
     }
     // second pass : try to restore all elements in the list
     NODE* ptr = list->first;
-    while(ptr->next) {    
-        char* elem_name = ptr->next->str;        
+    while(ptr->next) {
+        char* elem_name = ptr->next->str;
         char* elem_file = resolve_name(mode_flag, elem_name);
-        char elem_trash[ELEM_NAME_MAX];        
+        char elem_trash[ELEM_NAME_MAX];
         sprintf(elem_trash, "%s.trash", elem_file);
         if(check_file(elem_name, elem_trash) <= 0){
             // unable to find trash file
-            raise_error(ERROR_RECOVERABLE, "File '%s' not found", elem_trash);                       
+            raise_error(ERROR_RECOVERABLE, "File '%s' not found", elem_trash);
             trace(TRACE_DEBUG,
                         "%s:%d - Couldn't locate file '%s' for %s '%s'",
                         __FILE__, __LINE__, elem_trash, (mode_flag==ELEM_TAG)?"tag":"file", elem_name);
-                        
+
             ++err_i;
         }
         else {
@@ -402,7 +450,7 @@ void op_recover(int argc, char* argv[], int index){
                             __FILE__, __LINE__, elem_file);
                 ++err_i;
             }
-            else {                    
+            else {
                 ELEM elem;
                 elem_init(mode_flag, elem_name, &elem, 0);
                 // open the element's file
@@ -411,7 +459,7 @@ void op_recover(int argc, char* argv[], int index){
                     raise_error(ERROR_RECOVERABLE, "File '%s' not found", elem.file);
                     trace(TRACE_DEBUG,
                                 "%s:%d - Couldn't open '%s' for reading",
-                                __FILE__, __LINE__, elem.file);                
+                                __FILE__, __LINE__, elem.file);
                 }
                 else {
                     char line[ELEM_NAME_MAX];
@@ -422,7 +470,7 @@ void op_recover(int argc, char* argv[], int index){
                         trace(TRACE_DEBUG,
                                     "%s:%d - Couldn't read from '%s'",
                                     __FILE__, __LINE__, elem.file);
-                        ++err_i;                                
+                        ++err_i;
                     }
                     else {
                         // for each pointed element
@@ -436,15 +484,15 @@ void op_recover(int argc, char* argv[], int index){
                         }
                         ++elems_i;
                     }
-                    fclose(fp);                                    
+                    fclose(fp);
                 }
-            }            
+            }
         }
         free(elem_file);
         ptr = ptr->next;
     }
     list_free(list);
-    trace(TRACE_NORMAL, "%d %s(s) successfuly recovered, %d %s(s) ignored.", elems_i, (mode_flag==ELEM_TAG)?"tag":"file", err_i, (mode_flag==ELEM_TAG)?"tag":"file");    
+    trace(TRACE_NORMAL, "%d %s(s) successfuly recovered, %d %s(s) ignored.", elems_i, (mode_flag==ELEM_TAG)?"tag":"file", err_i, (mode_flag==ELEM_TAG)?"tag":"file");
 }
 
 /* Merge two elements.
@@ -456,7 +504,7 @@ void op_merge(int argc, char* argv[], int index){
     if( (index+1) >= argc) trace(TRACE_NORMAL, "Nothing to do.");
     else {
     	LIST* list = (LIST*) xzalloc(sizeof(LIST));
-    	list->first = (NODE*) xzalloc(sizeof(NODE));    
+    	list->first = (NODE*) xzalloc(sizeof(NODE));
         // create an array of files from all given elements
         for(int i = index; i < argc; ++i) {
             ELEM elem;
@@ -484,7 +532,7 @@ void op_merge(int argc, char* argv[], int index){
             ++elems_i;
         }
         list_free(list);
-        trace(TRACE_NORMAL, "%d %s successfuly merged.", elems_i, (mode_flag==ELEM_TAG)?"tags":"files");    
+        trace(TRACE_NORMAL, "%d %s successfuly merged.", elems_i, (mode_flag==ELEM_TAG)?"tags":"files");
     }
 }
 
@@ -508,29 +556,29 @@ void op_rename(int argc, char* argv[], int index){
         // return value must be 2 (created)
         raise_error(ERROR_USAGE, "%s '%s' already exists.", (mode_flag==ELEM_TAG)?"tag":"file", elem2.name);
     }
-    
+
     // trace(TRACE_NORMAL, "1 %s successfuly created.", (mode_flag==ELEM_TAG)?"tag":"file");
-    
+
     if( elem_init(mode_flag, argv[index], &elem1, 0) <= 0 ){
         raise_error(ERROR_ENV,
                     "%s:%d - Unexpected error occured when retrieving element %s",
                     __FILE__, __LINE__, elem1.name);
     }
-    
+
     int temp_flag = verbose_flag;
 
-    trace(TRACE_DEBUG, "merging %s '%s' and '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name, elem2.name);    
+    trace(TRACE_DEBUG, "merging %s '%s' and '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name, elem2.name);
     // merge both elements
     verbose_flag = 0;
         op_merge(argc, argv, index);
     verbose_flag = temp_flag;
 
-    // delete original element    
+    // delete original element
     trace(TRACE_DEBUG, "deleting %s '%s'", (mode_flag==ELEM_TAG)?"tag":"file", elem1.name);
     verbose_flag = 0;
         op_delete(argc-1, argv, index);
     verbose_flag = temp_flag;
-    
+
     trace(TRACE_NORMAL, "1 %s successfuly renamed.", (mode_flag==ELEM_TAG)?"tag":"file");
 }
 
@@ -558,7 +606,7 @@ void op_tag(int argc, char* argv[], int index){
         }
     }
 
-    // 2) apply changes to each file    
+    // 2) apply changes to each file
     for(int i = 0; i < files_i; ++i) {
         ELEM el_file;
         if( elem_init(ELEM_FILE, files[i], &el_file, 1) <= 0 ) {
@@ -609,7 +657,7 @@ void op_tag(int argc, char* argv[], int index){
 void op_list(int argc, char* argv[], int index) {
 	LIST* list = (LIST*) xzalloc(sizeof(LIST));
 	list->first = (NODE*) xzalloc(sizeof(NODE));
-    
+
     // argument may be used as mask for limiting resulting list (ex. tagger --files list "C:\test\*")
     // this allows to check a single element or to retrieve all nodes inside a given directory
     if(index < argc) {
@@ -618,7 +666,7 @@ void op_list(int argc, char* argv[], int index) {
             if(!glob_retrieve_list(GLOB_DB, mode_flag, argv[index], list)) {
                 raise_error(ERROR_ENV,
                             "%s:%d - Unable to retrieve %s list for pattern '%s'",
-                            __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"files":"tags", argv[index]);            
+                            __FILE__, __LINE__, (mode_flag==ELEM_TAG)?"files":"tags", argv[index]);
             }
         }
         else {
@@ -627,8 +675,8 @@ void op_list(int argc, char* argv[], int index) {
             if( elem_init(mode_flag, argv[index], &elem, 0) > 0) {
                 NODE* node = xmalloc(sizeof(NODE));
                 node->str = xmalloc(strlen(elem.name)+1);
-                strcpy(node->str, elem.name);                
-                list_insert_unique(list, node);                
+                strcpy(node->str, elem.name);
+                list_insert_unique(list, node);
             }
         }
     }
@@ -643,7 +691,7 @@ void op_list(int argc, char* argv[], int index) {
     // output resulting list
     if(!list->count) {
         if(index < argc) {
-            trace(TRACE_NORMAL, "No %s with given name in database.", (mode_flag==ELEM_TAG)?"tag":"file"); 
+            trace(TRACE_NORMAL, "No %s with given name in database.", (mode_flag==ELEM_TAG)?"tag":"file");
         }
         else {
             if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag in database.");
@@ -706,7 +754,7 @@ void op_query(int argc, char* argv[], int index) {
                     // given name contains wildcard : handle with globbing
                     LIST* list_related = (LIST*) xzalloc(sizeof(LIST));
                     list_related->first = (NODE*) xzalloc(sizeof(NODE));
-                    // retrieve all elements pointed by wildcard 
+                    // retrieve all elements pointed by wildcard
                     // (we force DB globbing instead of FS globbing by using type ELEM_TAG)
                     if(!glob_retrieve_list(GLOB_DB, (mode_flag%2)+1, argv[i], list_related)) {
                         raise_error(ERROR_ENV,
@@ -754,7 +802,7 @@ void op_query(int argc, char* argv[], int index) {
 			}
         }
         // output resulting files list
-        if(!list_elems->count) {        
+        if(!list_elems->count) {
             if(mode_flag==ELEM_TAG) trace(TRACE_NORMAL, "No tag currently applied on given file(s).");
             else                    trace(TRACE_NORMAL, "No file currently tagged with given tag(s).");
         }
@@ -763,9 +811,8 @@ void op_query(int argc, char* argv[], int index) {
                         "%s:%d - Unable to output elements list"
                         __FILE__, __LINE__);
         }
-
         list_free(list_elems);
-        free(elems_dir);        
+        free(elems_dir);
     }
 }
 
@@ -783,7 +830,7 @@ int main(int argc, char* argv[]) {
     for(int i = 1; i < argc; ++i) {
         if(strlen(argv[i]) == 0){
             // invalid argument
-            usage(1);            
+            usage(1);
             raise_error(ERROR_USAGE, "Empty argument detected.");
         }
         // if something goes wrong, pointer is assigned to NULL
@@ -791,51 +838,70 @@ int main(int argc, char* argv[]) {
     }
 
     // process given arguments
-    int opt, arg_i;
+    int opt_i, arg_i = 1;
 
     // 1) check options
-    for(arg_i = 1; arg_i < argc; ++arg_i) {
-        opt = -1;
-        // try to find matching option, if any
-        if(argv[arg_i][0] != '-' || argv[arg_i][1] != '-') {
-            // current argument does not match options syntax
-            break;
-        }
-        for(int j = 0; options[j].name; ++j) {
-            if(strcmp(argv[arg_i]+2, options[j].name) == 0) {
-                opt = j;
-                // process invoked option
-                if(options[j].flag != NULL) {
-                    *(options[j].flag) = options[j].val;
-                }
-                else {
-                    switch(options[j].val) {
-                        case 'h':
-                            // display help
-                            usage(0);
-                            exit(0);
-                            break;
-                        case 'v':
-                            // display app version
-                            version();
-                            exit(0);
-                            break;
+    while(1) {
+        int c = getopt_long (argc, argv, "", options, &opt_i);
+        /* detect the end of the options. */
+        if (c == -1) break;
+        else {
+            ++arg_i;
+            switch (c) {
+                case 0:
+                    /* If this option set a flag, do nothing else now. */
+                    if (options[opt_i].flag != NULL) {
+                        // *(options[opt_i].flag) = options[opt_i].val;
+                        break;
                     }
-                }
+                    if (optarg) {
+                        // options[opt_i].name
+                    }
+                    break;
+                case MODE_OPTION:
+                    if (optarg) {
+                        if (!strcasecmp("tags", optarg) ) mode_flag = ELEM_TAG;
+                        else if (!strcasecmp("files", optarg) ) mode_flag = ELEM_FILE;
+                    }
+                    break;
+                case LOCAL_OPTION:
+                    strcpy(ENV_PATH, "current");
+                    break;
+                case ENV_PATH_OPTION:
+                    if (optarg) {
+                        if(!strcasecmp("home", optarg)) strcpy(ENV_PATH, "home");
+                        else if(!strcasecmp("current", optarg)) strcpy(ENV_PATH, "current");
+                        else strcpy(ENV_PATH, optarg);
+                    }
+                    break;
+                case ENV_DIR_OPTION:
+                    if (optarg) strcpy(ENV_DIR, optarg);
+                    break;
+                case DB_NODE_SYNTAX_OPTION:
+                    if (optarg) {
+                        if(!strcasecmp(optarg, "relative")) strcpy(DB_NODE_SYNTAX, "relative");
+                        else if(!strcasecmp(optarg, "absolute")) strcpy(DB_NODE_SYNTAX, "absolute");
+                    }
+                    break;
+                case DB_CHARSET_OPTION:
+                    // todo
+                    break;
+                case 'h':
+                    // display help
+                    usage(0);
+                    exit(0);
+                    break;
+                case 'v':
+                    // display app version
+                    version();
+                    exit(0);
+                    break;
+                default:
+                    exit(1);
             }
-        }
-        if(opt == -1) {
-            // unknown option
-            usage(1);
-            raise_error(ERROR_USAGE, "Unknown option.");
         }
     }
 
-    // 2 bis) check for environment
-    if(!check_env()) {
-        trace(TRACE_NORMAL, "Installation directory not found or corrupted... Try 'tagger init'");
-    }
-    
     // 2) check operation
     trace(TRACE_DEBUG, "checking operations");
 
@@ -845,9 +911,12 @@ int main(int argc, char* argv[]) {
         for(int i = 0; operations[i].name; ++i) {
             if(strcmp(argv[arg_i], operations[i].name) == 0) {
                 trace(TRACE_DEBUG, "found matching operation: '%s'", operations[i].name);
+                if(!check_env() && strcmp(operations[i].name, "init") ) {
+                    raise_error(ERROR_USAGE, "Installation directory not found or corrupted... Try 'tagger init'");
+                }
                 // dispatch actions and arguments processing to invoked operation
                 operations[i].f(argc, argv, arg_i+1);
-                return 0;
+                return EXIT_SUCCESS;
             }
         }
         // either omitted 'tag' operation or unknown operation

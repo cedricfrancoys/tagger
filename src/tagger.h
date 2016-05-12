@@ -67,4 +67,7 @@ void op_list(int argc, char* argv[], int index);
 /* Retrieve all elements matching given criteria. */
 void op_query(int argc, char* argv[], int index);
 
+/* Remove deleted items from DB files. */
+void op_clean(int argc, char* argv[], int index);
+
 #endif

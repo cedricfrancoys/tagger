@@ -9,6 +9,20 @@
 #ifndef ENV_H
 #define ENV_H 1
 
+/* We'll use a local-defined value for constant FILENAME_MAX
+ (which might not be defined on some environement)
+*/
+#if defined( FILENAME_MAX )
+#undef FILENAME_MAX
+#endif
+
+/* Force FILENAME_MAX macro to a local value for compatibility purpose.
+ FILENAME_MAX serves as system limit for the length of a string holding a filename with full path.
+ (Though 1024 chars long is a quite long path, this might be adjusted depending on user's specific needs.)
+*/
+#define FILENAME_MAX 1024
+
+
 /* Convert a path string according to current environment.
 */
 char* fix_path(char* path);
