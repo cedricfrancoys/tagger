@@ -146,7 +146,6 @@ char* get_install_dir() {
                     sprintf(temp, "%s%s%s", current_dir, PATH_SEPARATOR, ENV_DIR);
                     if(opendir(temp)) {
                         strcpy(install_dir, temp);
-                        found = 1;
                         break;
                     }
                     char* sep = strrchr(current_dir, PATH_SEPARATOR[0]);

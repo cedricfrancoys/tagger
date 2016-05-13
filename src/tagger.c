@@ -187,10 +187,15 @@ void usage (int status) {
         puts("USAGE: tagger [OPTION] OPERATION [PARAMETERS]");
         puts("OPTIONS:\n\
   --mode=           Specify on which elements operation is to apply\n\
+                    Possible values: 'tags|'files'\n\
+                    Default: 'tags'\n\
   --tags            Set mode to apply operation on 'tag' elements (default)\n\
   --files           Set mode to apply operation on 'file' elements\n\n\
-  --env-path=       'home|'current'|{custom path}\n\
-  --env-dir=        default is '.tagger'\n\
+  --env-path=       Force using a specific path for storing database\n\
+                    Possible values: 'home|'current'|{custom path}\n\
+                    Default: 'home'\n\
+  --env-dir=        Force using a specific name for database folder\n\
+                    Default '.tagger'\n\
   --local           Force using current directory for database\n\n\
   --trash           Restrict current operation to trashed elements only\n\
   --db-charset=     Specify database charset (default is UTF-8)\n\
