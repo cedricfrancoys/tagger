@@ -250,3 +250,6 @@ tagger
 ## Author ##
 
 Feel free to send any comments, patches, suggestions or flowers to Cédric Françoys <cedricfrancoys@gmail.com>
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTcxMjA4NTM2OV19
+-->
