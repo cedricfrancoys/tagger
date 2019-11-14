@@ -7,11 +7,11 @@
 # ------------------------------------------------
 
 # project name (generate executable with this name)
-TARGET   = tagger.o
+TARGET   = tagger
 
 CC       = c99
 # compiling flags here
-CFLAGS   = -I/usr/include -D_BSD_SOURCE
+CFLAGS   = -I/usr/include -D_DEFAULT_SOURCE
 
 LINKER   = gcc -o
 # linking flags here
