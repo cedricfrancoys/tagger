@@ -40,8 +40,11 @@ char* get_charset() {
     // read environment locale for LC_CTYPE category
     setlocale(LC_CTYPE, "");
     char* locale = setlocale(LC_CTYPE, NULL);    
-    // return codeset (last block of chars preceeded by a dot)
-    return strrchr(locale, '.')+1;
+    if (strstr(locale, ".") != NULL) {
+      // return codeset (last block of chars preceeded by a dot)
+      return strrchr(locale, '.')+1;
+    }
+    return locale;
 }
 
 char* get_input_charset() {
@@ -59,7 +62,6 @@ char* get_input_charset() {
 char* get_output_charset() {
     static char result[128];
     char* charset = get_charset();
-
     if(strcmp(OS_ENV, "WIN32") == 0) {
         char* tmp = (char*) xmalloc(1024);
 		char* temp_dir = getenv("TEMP");
