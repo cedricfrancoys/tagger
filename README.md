@@ -29,6 +29,19 @@ Notes:
   6. [tagsistant](http://www.tagsistant.net/): Linux only, uses FS commands to manage tags (mkdir, cp, ls), limited querying possibilities.
   7. [OYEPA](http://pages.stern.nyu.edu/~marriaga/software/oyepa/) : cross platform, requires Python2.5+, GUI only, needs directories to be watched before taggging, alter filenames in order to store tagging data.
 
+## Install
+
+### Linux 
+```bash
+apt-get update
+apt-get install git gcc make
+git clone https://github.com/cedricfrancoys/tagger.git
+cd tagger/
+mv makefile.lin makefile
+make
+./tagger init 
+./tagger --help
+```
 
 ## How to use it? ##
 Commands allow to set and modify relations between two kind of elements: tags and filesystem nodes (hereafter referred to as 'files').
