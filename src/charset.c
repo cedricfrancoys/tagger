@@ -118,6 +118,10 @@ char* strtoutf8(char* cs_from, char* str) {
     if(cs_from == NULL) {
         return result;
     }
+
+    if(strcmp(cs_from, "C") == 0) {
+	return str;
+    }
         
     size_t len_in = strlen(str)+1;    
 
@@ -158,6 +162,10 @@ char* utf8tostr(char* cs_to, char* str) {
 
     if(cs_to == NULL) {
         return result;
+    }
+
+    if(strcmp(cs_to, "C") == 0) {
+	return str;
     }
 
     size_t len_in = strlen(str)+1;
